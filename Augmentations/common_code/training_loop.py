@@ -1,7 +1,7 @@
 import os
 from tensorflow.keras import optimizers
-from utils import reset_tpu
-from get_dataset import get_dataset
+from .utils import reset_tpu
+from .get_dataset import get_dataset
 import tensorflow as tf
 
 def perform_training(models, training_config):

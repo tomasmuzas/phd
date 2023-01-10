@@ -1,5 +1,5 @@
 import tensorflow as tf
-from augmentation_functions import *
+from .augmentation_functions import *
 
 AUTO = tf.data.AUTOTUNE
 
