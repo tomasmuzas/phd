@@ -13,17 +13,17 @@ def perform_training(models, training_config):
         model_factory = model['func']
         model_starting_fold = model['starting_fold']
         
-        image_size = training_config.IMAGE_SIZE
+        image_size = training_config["IMAGE_SIZE"]
 
-        model_path = f"models/{image_size}x{image_size}/experiments/{training_config.EXPERIMENT_DESCRIPTION}/{model_name}"
+        model_path = f"models/{image_size}x{image_size}/experiments/{training_config['EXPERIMENT_DESCRIPTION']}/{model_name}"
         initial_model_path = f"models/{image_size}x{image_size}/initial_models/{model_name}"
         # Create initial model
-        if not os.path.isdir(f"{training_config.LOCAL_GCP_PATH_BASE}/{initial_model_path}"):
+        if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
             print("Creating new weights")
             strategy = reset_tpu(training_config)
             with strategy.scope():
-                optimizer = optimizers.Adam(learning_rate= training_config.LEARNING_RATE, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                model = model_factory()
+                optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                model = model_factory(training_config)
 
                 model.compile(
                     loss=tf.keras.losses.BinaryCrossentropy(),
@@ -31,15 +31,15 @@ def perform_training(models, training_config):
                     optimizer=optimizer,
                     metrics=[tf.keras.metrics.BinaryAccuracy()])
 
-                print(f"Saving initial model to {training_config.REMOTE_GCP_PATH_BASE}/{initial_model_path}")
-                model.save(f"{training_config.REMOTE_GCP_PATH_BASE}/{initial_model_path}")
+                print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
 
         for i in range(model_starting_fold, 11):
             tf.keras.backend.clear_session()
             strategy = reset_tpu(training_config)
             with strategy.scope():
                 # with tf.device("/device:GPU:0"):
-                optimizer = optimizers.Adam(learning_rate= training_config.LEARNING_RATE, beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
                 print(f"{model_name} FOLD {i}")
 
                 best_epoch = 0
@@ -47,18 +47,18 @@ def perform_training(models, training_config):
 
                 test_dataset = get_dataset(
                     training_config,
-                    f"{training_config.REMOTE_GCP_PATH_BASE}/data/{image_size}x{image_size}/fold_{i}/test",
-                    training_config.TEST_BATCH_SIZE,
-                    seed = training_config.SEED,
+                    f"{training_config['REMOTE_GCP_PATH_BASE']}/data/{image_size}x{image_size}/fold_{i}/test",
+                    training_config["TEST_BATCH_SIZE"],
+                    seed = training_config["SEED"],
                     augment = False,
                     shuffle = False,
                     drop_remainder = True)
 
-                if training_config.TPU:
+                if training_config["TPU"]:
                     test_dataset = test_dataset.cache()
 
-                print(f"Loading model from {training_config.REMOTE_GCP_PATH_BASE}/{initial_model_path}")
-                model = tf.keras.models.load_model(f"{training_config.REMOTE_GCP_PATH_BASE}/{initial_model_path}")
+                print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
 
                 model.compile(
                     loss=tf.keras.losses.BinaryCrossentropy(),
@@ -68,12 +68,12 @@ def perform_training(models, training_config):
 
                 model.summary()
 
-                for epoch in range(training_config.NUMBER_OF_EPOCHS):
+                for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
                     train_dataset = get_dataset(
                         training_config,
-                        f"{training_config.REMOTE_GCP_PATH_BASE}/data/{image_size}x{image_size}/fold_{i}/train",
-                        training_config.TRAIN_BATCH_SIZE,
-                        seed = training_config.SEED + epoch,
+                        f"{training_config['REMOTE_GCP_PATH_BASE']}/data/{image_size}x{image_size}/fold_{i}/train",
+                        training_config["TRAIN_BATCH_SIZE"],
+                        seed = training_config["SEED"] + epoch,
                         augment = True,
                         shuffle = True,
                         drop_remainder = False)
@@ -82,20 +82,20 @@ def perform_training(models, training_config):
                         x= train_dataset,
                         validation_data = test_dataset,
                         epochs = 1,
-                        steps_per_epoch = 284672 // training_config.TRAIN_BATCH_SIZE,
-                        validation_steps = 31595 // training_config.TEST_BATCH_SIZE,
+                        steps_per_epoch = 284672 // training_config["TRAIN_BATCH_SIZE"],
+                        validation_steps = 31595 // training_config["TEST_BATCH_SIZE"],
                         verbose = 1,
                         shuffle = False,
-                        workers= 32 if training_config.TPU else 1)
+                        workers= 32 if training_config["TPU"] else 1)
 
                     last_loss = history.history['val_loss'][-1]
                     if (last_loss < best_loss):
                         print("Loss improved. Saving model.")
                         best_epoch = epoch
                         best_loss = last_loss
-                        model.save(f"{training_config.REMOTE_GCP_PATH_BASE}/{model_path}/best_loss/fold_{i}")
+                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
 
 
-                    if(epoch - training_config.EARLY_STOPPING_TOLERANCE == best_epoch):
+                    if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
                         break

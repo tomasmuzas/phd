@@ -1,7 +1,7 @@
 import tensorflow as tf
 
 def reset_tpu(training_config):
-  if training_config.TPU:
+  if training_config["TPU"]:
     cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver.connect()
     strategy = tf.distribute.TPUStrategy(cluster_resolver)
     print("Running on TPU ", cluster_resolver.master())
