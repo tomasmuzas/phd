@@ -9,8 +9,10 @@ def perform_training(models, training_config):
     if not os.path.isdir("gcs"):
         raise Exception("local GCS folder must be mounted!")
 
+    image_size = training_config["IMAGE_SIZE"]
+    experiment_path = f"models/{image_size}x{image_size}/experiments/{training_config['EXPERIMENT_DESCRIPTION']}"
     # save configuration in a file
-    f = open("training_config.json", "x")
+    f = open(f"{training_config['LOCAL_GCP_PATH_BASE']}/{experiment_path}/training_config.json", "x")
     f.write(json.dumps(training_config))
     f.close()
 
@@ -18,10 +20,8 @@ def perform_training(models, training_config):
         model_name = model['name']
         model_factory = model['func']
         model_starting_fold = model['starting_fold']
-        
-        image_size = training_config["IMAGE_SIZE"]
 
-        model_path = f"models/{image_size}x{image_size}/experiments/{training_config['EXPERIMENT_DESCRIPTION']}/{model_name}"
+        model_path = f"{experiment_path}/{model_name}"
         initial_model_path = f"models/{image_size}x{image_size}/initial_models/{model_name}"
         # Create initial model
         if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
