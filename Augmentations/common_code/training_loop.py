@@ -3,10 +3,16 @@ from tensorflow.keras import optimizers
 from .utils import reset_tpu
 from .get_dataset import get_dataset
 import tensorflow as tf
+import json
 
 def perform_training(models, training_config):
     if not os.path.isdir("gcs"):
         raise Exception("local GCS folder must be mounted!")
+
+    # save configuration in a file
+    f = open("training_config.json", "x")
+    f.write(json.dumps(training_config))
+    f.close()
 
     for model in models:
         model_name = model['name']
