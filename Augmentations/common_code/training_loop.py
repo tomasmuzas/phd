@@ -4,6 +4,7 @@ from .utils import reset_tpu
 from .get_dataset import get_dataset
 import tensorflow as tf
 import json
+from pathlib import Path
 
 def perform_training(models, training_config):
     if not os.path.isdir("gcs"):
@@ -12,6 +13,7 @@ def perform_training(models, training_config):
     image_size = training_config["IMAGE_SIZE"]
     experiment_path = f"models/{image_size}x{image_size}/experiments/{training_config['EXPERIMENT_DESCRIPTION']}"
     # save configuration in a file
+    Path(f"{training_config['LOCAL_GCP_PATH_BASE']}/{experiment_path}").mkdir(parents=True, exist_ok=True)
     f = open(f"{training_config['LOCAL_GCP_PATH_BASE']}/{experiment_path}/training_config.json", "x")
     f.write(json.dumps(training_config))
     f.close()
