@@ -38,6 +38,10 @@ def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_
         dataset = dataset.map(lambda x,y : (random_rotate(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_RANDOM_NOISE"]:
         dataset = dataset.map(lambda x,y : (random_noise(x, seed), y), num_parallel_calls=AUTO)
+      if training_config["AUGMENTATIONS_CENTER_NOISE"]:
+        dataset = dataset.map(lambda x,y : (targeted_center_noise(x, seed), y), num_parallel_calls=AUTO)
+      if training_config["AUGMENTATIONS_OUTSIDE_NOISE"]:
+        dataset = dataset.map(lambda x,y : (targeted_outside_noise(x, seed), y), num_parallel_calls=AUTO)
 
   dataset = dataset.batch(batch_size, drop_remainder=drop_remainder).prefetch(200 if training_config["TPU"] else 3)
 
