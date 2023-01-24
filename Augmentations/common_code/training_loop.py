@@ -74,8 +74,6 @@ def perform_training(models, training_config):
                     optimizer=optimizer,
                     metrics=[tf.keras.metrics.BinaryAccuracy()])
 
-                model.summary()
-
                 for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
                     train_dataset = get_dataset(
                         training_config,
