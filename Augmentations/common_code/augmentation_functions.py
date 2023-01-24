@@ -2,6 +2,7 @@ import tensorflow as tf
 import numpy as np
 from astropy.visualization import PercentileInterval
 from astropy.modeling.models import Sersic2D
+from perlin_numpy import generate_perlin_noise_2d
 
 x,y = np.meshgrid(np.arange(128), np.arange(128))
 
@@ -71,6 +72,18 @@ def targeted_outside_noise(x, seed):
     noise = tf.random.uniform(shape=tf.shape(x), minval= -0.2, maxval= 0.2, dtype=tf.float32)
     outside_noise = tf.math.multiply(noise, outside_noise_profile)
     x = tf.add(x, outside_noise)
+    x = tf.clip_by_value(x, clip_value_min=0, clip_value_max=1)
+  else:
+    x
+  return x
+
+@tf.function
+def perlin_center_noise(x, seed):
+  if  tf.random.uniform([], seed = seed) < 0.5:
+    perlin = generate_perlin_noise_2d((128, 128), (16, 16))
+    perlin_3d = np.repeat(perlin[:,:,None], 3, axis=2)
+    perlin_with_noise = perlin_3d * center_noise_profile * 0.1
+    x = tf.add(x, perlin_with_noise)
     x = tf.clip_by_value(x, clip_value_min=0, clip_value_max=1)
   else:
     x
