@@ -5,6 +5,7 @@ from .get_dataset import get_dataset
 import tensorflow as tf
 import json
 from pathlib import Path
+import tensorflow_addons as tfa
 
 def perform_training(models, training_config):
     if not os.path.isdir("gcs"):
@@ -30,7 +31,12 @@ def perform_training(models, training_config):
             print("Creating new weights")
             strategy = reset_tpu(training_config)
             with strategy.scope():
-                optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                    print("using AdaBelief optimizer")
+                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                else:
+                    print("Using Adam optimizer")
+                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
                 model = model_factory(training_config)
 
                 model.compile(
@@ -47,7 +53,10 @@ def perform_training(models, training_config):
             strategy = reset_tpu(training_config)
             with strategy.scope():
                 # with tf.device("/device:GPU:0"):
-                optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                else:
+                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
                 print(f"{model_name} FOLD {i}")
 
                 best_epoch = 0
