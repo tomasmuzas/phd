@@ -29,28 +29,20 @@ def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_
 
   if(augment):
       if training_config["AUGMENTATIONS_ZOOM"]:
-        print("Using zoom augmentation.")
         dataset = dataset.map(lambda x,y : (random_zoom(x, training_config["IMAGE_SIZE"], seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_FLIP_HORIZONTALLY"]:
-        print("Using horizontal flip augmentation.")
         dataset = dataset.map(lambda x,y : (random_invert_horizontally(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_FLIP_VERTICALLY"]:
-        print("Using vertical flip augmentation.")
         dataset = dataset.map(lambda x,y : (random_invert_vertically(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_ROTATE"]:
-        print("Using rotation augmentation.")
         dataset = dataset.map(lambda x,y : (random_rotate(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_RANDOM_NOISE"]:
-        print("Using random noise augmentation.")
         dataset = dataset.map(lambda x,y : (random_noise(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_CENTER_NOISE"]:
-        print("Using center noise augmentation.")
         dataset = dataset.map(lambda x,y : (targeted_center_noise(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_OUTSIDE_NOISE"]:
-        print("Using outside noise augmentation.")
         dataset = dataset.map(lambda x,y : (targeted_outside_noise(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_PERLIN_CENTER_NOISE"]:
-        print("Using perlin center noise augmentation.")
         dataset = dataset.map(lambda x,y : (perlin_center_noise(x, seed), y), num_parallel_calls=AUTO)
 
   dataset = dataset.batch(batch_size, drop_remainder=drop_remainder).prefetch(200 if training_config["TPU"] else 3)
