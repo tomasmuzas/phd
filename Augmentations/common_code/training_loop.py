@@ -79,7 +79,7 @@ def perform_training(models, training_config):
 
                 model.compile(
                     loss=tf.keras.losses.BinaryCrossentropy(),
-                    steps_per_execution = 1,
+                    steps_per_execution = training_config['STEPS_PER_EXECUTION'],
                     optimizer=optimizer,
                     metrics=[tf.keras.metrics.BinaryAccuracy()])
 
