@@ -64,7 +64,7 @@ def perform_training(models, training_config):
 
                 test_dataset = get_dataset(
                     training_config,
-                    f"{training_config['REMOTE_GCP_PATH_BASE']}/data/{image_size}x{image_size}/fold_{i}/test",
+                    f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/{image_size}x{image_size}/fold_{i}/test",
                     training_config["TEST_BATCH_SIZE"],
                     seed = training_config["SEED"],
                     augment = False,
@@ -86,7 +86,7 @@ def perform_training(models, training_config):
                 for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
                     train_dataset = get_dataset(
                         training_config,
-                        f"{training_config['REMOTE_GCP_PATH_BASE']}/data/{image_size}x{image_size}/fold_{i}/train",
+                        f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/{image_size}x{image_size}/fold_{i}/train",
                         training_config["TRAIN_BATCH_SIZE"],
                         seed = training_config["SEED"] + epoch,
                         augment = True,
