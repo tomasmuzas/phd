@@ -15,7 +15,7 @@ def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_
   dataset = dataset.map(lambda records: tf.io.parse_single_example(
       records,
       {
-          "image": tf.io.FixedLenFeature([], dtype=tf.string),
+          "image": tf.io.FixedLenFeature([128*128], dtype=tf.int64),
           "class": tf.io.FixedLenFeature([], dtype=tf.int64),
 
           "label": tf.io.FixedLenFeature([], dtype=tf.string),
@@ -23,9 +23,8 @@ def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_
           "one_hot_class": tf.io.VarLenFeature(tf.float32)
       }),
       num_parallel_calls=AUTO)
-  dataset = dataset.map(lambda item: (tf.reshape(tf.image.decode_jpeg(item['image'], channels=3), [training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3]), item['class']), num_parallel_calls=AUTO)
+  dataset = dataset.map(lambda item: (tf.reshape(item['image'], [training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 1]), item['class']), num_parallel_calls=AUTO)
   dataset = dataset.map(lambda x,y: (tf.cast(x, tf.float32), y), num_parallel_calls=AUTO)
-  dataset = dataset.map(lambda x,y: (tf.keras.layers.Rescaling(scale=1./255)(x), y), num_parallel_calls=AUTO)
 
   if(augment):
       if training_config["AUGMENTATIONS_ZOOM"]:

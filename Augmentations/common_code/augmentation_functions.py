@@ -32,7 +32,7 @@ def random_invert_vertically(x, seed):
 def random_rotate(x, seed):
   return tf.cond(
       tf.random.uniform([], seed = seed) < 0.5,
-      lambda: tf.image.rot90(x, k = tf.random.uniform([], minval=1, maxval=4, dtype=tf.int32, seed = seed)),
+      lambda: tf.image.rot90(x, k = tf.random.uniform([], minval=1, maxval = 4, dtype=tf.int32, seed = seed)),
       lambda: x)
 
 @tf.function
