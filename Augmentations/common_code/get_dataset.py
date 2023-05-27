@@ -3,7 +3,7 @@ from .augmentation_functions import *
 
 AUTO = tf.data.AUTOTUNE
 
-def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_remainder, stretch):
+def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_remainder):
   if not training_config["ENABLE_DETERMINISM"]:
     seed = None
 
