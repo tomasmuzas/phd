@@ -15,7 +15,7 @@ def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_
   dataset = dataset.map(lambda records: tf.io.parse_single_example(
       records,
       {
-          "image": tf.io.FixedLenFeature([128*128], dtype=tf.int64),
+          "image": tf.io.FixedLenFeature([128*128], dtype=tf.float32),
           "class": tf.io.FixedLenFeature([], dtype=tf.int64),
 
           "label": tf.io.FixedLenFeature([], dtype=tf.string),
