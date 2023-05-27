@@ -26,7 +26,7 @@ def get_dataset(training_config, path, batch_size, seed, augment, shuffle, drop_
   dataset = dataset.map(lambda item: (tf.reshape(item['image'], [training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 1]), item['class']), num_parallel_calls=AUTO)
   dataset = dataset.map(lambda x,y: (tf.cast(x, tf.float32), y), num_parallel_calls=AUTO)
   if(training_config["STRETCH"]):
-    dataset = dataset.map(lambda x,y: (tf.math.asinh(training_config["STRETCH_Q"] * training_config["STRETCH_ALPHA"] * (x - tf.math.reduce_min(x))) / training_config["STRETCH_Q"]) , y), num_parallel_calls=AUTO)
+    dataset = dataset.map(lambda x,y: (tf.math.asinh(training_config["STRETCH_Q"] * training_config["STRETCH_ALPHA"] * (x - tf.math.reduce_min(x))) / training_config["STRETCH_Q"] , y), num_parallel_calls=AUTO)
 
   if(augment):
       if training_config["AUGMENTATIONS_ZOOM"]:
