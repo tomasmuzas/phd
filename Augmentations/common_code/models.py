@@ -10,7 +10,7 @@ from tensorflow.keras.layers import Dense, Dropout, Flatten, BatchNormalization,
 def create_ResNet50(training_config):
   model = Sequential()
   model.add(ResNet50(
-    input_shape = (training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 1),
+    input_shape = (training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3),
     include_top = False,
     weights = None,
     pooling = 'avg'))
@@ -20,7 +20,7 @@ def create_ResNet50(training_config):
 def create_EffNetB7(training_config):
   model = Sequential()
   model.add(tf.keras.applications.efficientnet.EfficientNetB7(
-    input_shape = (training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 1),
+    input_shape = (training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3),
     include_top = False,
     weights = None,
     pooling = 'avg'))
@@ -29,7 +29,7 @@ def create_EffNetB7(training_config):
 
 def Dieleman(training_config):
   model = Sequential(name="Dieleman")
-  model.add(Input(shape=(training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 1)))
+  model.add(Input(shape=(training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3)))
   model.add(Conv2D(filters=32, kernel_size=6, activation='relu'))
   model.add(BatchNormalization())
   model.add(MaxPool2D(2))
@@ -52,7 +52,7 @@ def Dieleman(training_config):
 
 def SimpleModel(training_config):
   model = Sequential(name="SimpleModel")
-  model.add(Input(shape=(training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 1)))
+  model.add(Input(shape=(training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3)))
   model.add(Conv2D(filters=64, kernel_size=5, activation='relu'))
   model.add(MaxPool2D(2))
   model.add(Conv2D(filters=32, kernel_size=5, activation='relu'))
@@ -65,7 +65,7 @@ def SimpleModel(training_config):
 
 def Cavanagh(training_config):
   model = Sequential(name="Cavanagh")
-  model.add(Input(shape=(training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 1)))
+  model.add(Input(shape=(training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3)))
   model.add(Conv2D(filters=32, kernel_size=7, activation='relu'))
   model.add(BatchNormalization())
   model.add(MaxPool2D(2))
