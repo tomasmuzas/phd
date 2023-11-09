@@ -182,7 +182,7 @@ def perform_training(models, training_config):
                     epochs = 1,
                     steps_per_epoch = training_config["TRAIN_DATASET_SIZE"] // training_config["TRAIN_BATCH_SIZE"],
                     validation_steps = training_config["TEST_DATASET_SIZE"] // training_config["TEST_BATCH_SIZE"],
-                    verbose = 0,
+                    verbose = 1,
                     shuffle = False,
                     workers= 32 if training_config["TPU"] else 1)
 
