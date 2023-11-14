@@ -58,6 +58,29 @@ def get_and_log_predictions(model, dataset):
 #   wandb.run.log_artifact(table)
   return (true_labels, predictions)
 
+def get_and_log_predictions_multiclass(model, dataset):
+  
+#   table = wandb.Artifact("test_predictions" + str(wandb.run.id), type="predictions")
+#   predictions_table = wandb.Table(columns=["Id", "Image", "True", "Predicted"])
+
+  galaxy_ids = np.empty([0, 1], dtype=str)
+  predictions = np.empty([0, 1], dtype=float)
+  true_labels = np.empty([0, 1], dtype=float)
+
+  for images, labels, objids in dataset:
+    results = model.predict_on_batch(images)
+    
+    galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
+    true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
+    predictions = tf.concat([tf.reshape(results, [-1, 1]), predictions], axis=0)
+
+#     for index, image in enumerate(images):
+#         predictions_table.add_data(galaxy_ids[index].numpy()[0], wandb.Image(image), int(true_labels[index]), float(predictions[index])) 
+
+#   table.add(predictions_table, "predictions")
+#   wandb.run.log_artifact(table)
+  return (true_labels, predictions)
+
 def perform_training(models, training_config):
     if training_config["TPU"] and not os.path.isdir("gcs"):
         raise Exception("local GCS folder must be mounted!")
@@ -196,6 +219,30 @@ def perform_training(models, training_config):
                     else:
                         wandb.log({"acc": history.history['val_sparse_categorical_accuracy'][-1], "loss": history.history['val_loss'][-1]})
 
+                    print("Metrics logged, calculating matrix")
+                    if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+                        true_labels, predictions = get_and_log_predictions(best_model, test_dataset_with_ids)
+                        cm = confusion_matrix(true_labels, np.where(predictions > 0.5, 1, 0))
+                        display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['Spiral', 'Elliptical'])
+                        plot = display.plot()
+                        wandb.log({"Confusion matrix": plt})
+
+                        accuracy = accuracy_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                        precision = precision_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                        recall = recall_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                        f1 = f1_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                        tnr = cm[0][0] / (cm[0][0] + cm[0][1])
+                    else:
+                        true_labels, predictions = get_and_log_predictions_multiclass(best_model, test_dataset_with_ids)
+                        print(true_labels)
+                        print(predictions)
+                        print(np.argmax(predictions, axis= 1))
+                        cm = confusion_matrix(true_labels, np.argmax(predictions, axis= 1))
+                        print(cm)
+                        display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['CertainElliptical', 'UncertainElliptical', 'Unknown', 'UncertainSpiral', 'CertainSpiral'])
+                        plot = display.plot()
+                        wandb.log({"Confusion matrix": plt})
+
                     last_loss = history.history['val_loss'][-1]
                     if (last_loss < best_loss):
                         print("Loss improved. Saving model.")
@@ -211,25 +258,8 @@ def perform_training(models, training_config):
 
 
                 test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test", training_config["TEST_BATCH_SIZE"])
-                true_labels, predictions = get_and_log_predictions(best_model, test_dataset_with_ids)
                 
-                
-                if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
-                    cm = confusion_matrix(true_labels, np.where(predictions > 0.5, 1, 0))
-                    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['Spiral', 'Elliptical'])
-                    plot = display.plot()
-                    wandb.log({"Confusion matrix": plt})
 
-                    accuracy = accuracy_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    precision = precision_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    recall = recall_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    f1 = f1_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    tnr = cm[0][0] / (cm[0][0] + cm[0][1])
-                else:
-                    cm = confusion_matrix(true_labels, np.argmax(predictions, axis= 1))
-                    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['Spiral', 'Elliptical'])
-                    plot = display.plot()
-                    wandb.log({"Confusion matrix": plt})
 
             table = wandb.Table(columns = ['accuracy', 'precision', 'recall', 'f1', 'TNR'], data = [[accuracy, precision, recall, f1, tnr]])
             wandb.log({"metrics" : table})
