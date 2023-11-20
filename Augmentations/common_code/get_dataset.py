@@ -24,15 +24,13 @@ def get_intial_fold_dataset(training_config, path, seed, shuffle):
       }),
       num_parallel_calls=AUTO)
   dataset = dataset.map(lambda item: (tf.reshape(tf.image.decode_jpeg(item['image'], channels=3), [training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3]), item['class']), num_parallel_calls=AUTO)
+  dataset = dataset.map(lambda x,y: (tf.cast(x, tf.float32), y), num_parallel_calls=AUTO)
+  dataset = dataset.map(lambda x,y: (tf.keras.layers.Rescaling(scale=1./255)(x), y), num_parallel_calls=AUTO)
   dataset = dataset.cache()
 
   return dataset
 
 def shuffle_dataset(dataset, training_config, batch_size, seed, augment, drop_remainder):
-
-  # moved to this method to save memory of int -> float conversion
-  dataset = dataset.map(lambda x,y: (tf.cast(x, tf.float32), y), num_parallel_calls=AUTO)
-  dataset = dataset.map(lambda x,y: (tf.keras.layers.Rescaling(scale=1./255)(x), y), num_parallel_calls=AUTO)
 
   if(augment):
       if training_config["AUGMENTATIONS_ZOOM"]:
