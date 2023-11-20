@@ -98,6 +98,7 @@ def perform_training(models, training_config):
     
     os.environ["WANDB_SILENT"] = "true"
 
+    strategy = reset_tpu(training_config)
     with strategy.scope():
         for model in models:
             model_name = model['name']
