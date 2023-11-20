@@ -110,31 +110,29 @@ def perform_training(models, training_config):
             # Create initial model
             if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
                 print("Creating new weights")
-                strategy = reset_tpu(training_config)
-                with strategy.scope():
-                    if(training_config["USE_ADABELIEF_OPTIMIZER"]):
-                        print("using AdaBelief optimizer")
-                        optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
-                    else:
-                        print("Using Adam optimizer")
-                        optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                    model = model_factory(training_config)
+                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                    print("using AdaBelief optimizer")
+                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                else:
+                    print("Using Adam optimizer")
+                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                model = model_factory(training_config)
 
-                    if binary_mode:
-                        model.compile(
-                            loss=tf.keras.losses.BinaryCrossentropy(),
-                            steps_per_execution = 1,
-                            optimizer=optimizer,
-                            metrics=[tf.keras.metrics.BinaryAccuracy()])
-                    else:
-                        model.compile(
-                            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                            steps_per_execution = 1,
-                            optimizer=optimizer,
-                            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+                if binary_mode:
+                    model.compile(
+                        loss=tf.keras.losses.BinaryCrossentropy(),
+                        steps_per_execution = 1,
+                        optimizer=optimizer,
+                        metrics=[tf.keras.metrics.BinaryAccuracy()])
+                else:
+                    model.compile(
+                        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                        steps_per_execution = 1,
+                        optimizer=optimizer,
+                        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
 
-                    print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                    model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
 
             training_config["MODEL_NAME"] = model_name
             strategy = reset_tpu(training_config)
