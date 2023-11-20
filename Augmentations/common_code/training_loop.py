@@ -60,8 +60,8 @@ def get_and_log_predictions(model, dataset):
 
 def get_and_log_predictions_multiclass(model, dataset):
   
-#   table = wandb.Artifact("test_predictions" + str(wandb.run.id), type="predictions")
-#   predictions_table = wandb.Table(columns=["Id", "Image", "True", "Predicted"])
+  table = wandb.Artifact("test_predictions" + str(wandb.run.id), type="predictions")
+  predictions_table = wandb.Table(columns=["Id", "True", "Predicted"])
 
   galaxy_ids = np.empty([0, 1], dtype=str)
   predictions = np.empty([0, 1], dtype=float)
@@ -72,20 +72,23 @@ def get_and_log_predictions_multiclass(model, dataset):
     
     galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
     true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
-    predictions = tf.concat([tf.reshape(results, [-1, 1]), predictions], axis=0)
+    predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
 
-#     for index, image in enumerate(images):
-#         predictions_table.add_data(galaxy_ids[index].numpy()[0], wandb.Image(image), int(true_labels[index]), float(predictions[index])) 
+    for index, image in enumerate(images):
+        predictions_table.add_data(galaxy_ids[index].numpy()[0], int(true_labels[index]), float(predictions[index])) 
 
-#   table.add(predictions_table, "predictions")
-#   wandb.run.log_artifact(table)
+  table.add(predictions_table, "predictions")
+  wandb.run.log_artifact(table)
   return (true_labels, predictions)
 
 def perform_training(models, training_config):
+
+    binary_mode = training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2
+
     if training_config["TPU"] and not os.path.isdir("gcs"):
         raise Exception("local GCS folder must be mounted!")
 
-    if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+    if binary_mode:
         print(f"Running in binary classification mode")
     else:
         print("Running in multiclass mode")
@@ -95,61 +98,52 @@ def perform_training(models, training_config):
     
     os.environ["WANDB_SILENT"] = "true"
 
-    for model in models:
-        model_name = model['name']
-        model_factory = model['func']
-        model_starting_fold = model['starting_fold']
+    with strategy.scope():
+        for model in models:
+            model_name = model['name']
+            model_factory = model['func']
+            model_starting_fold = model['starting_fold']
 
-        model_path = f"{experiment_path}/{model_name}"
-        initial_model_path = f"models/{image_size}x{image_size}/initial_models/{model_name}"
-        # Create initial model
-        if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
-            print("Creating new weights")
+            model_path = f"{experiment_path}/{model_name}"
+            initial_model_path = f"models/{image_size}x{image_size}/initial_models/{model_name}"
+            # Create initial model
+            if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
+                print("Creating new weights")
+                strategy = reset_tpu(training_config)
+                with strategy.scope():
+                    if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                        print("using AdaBelief optimizer")
+                        optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                    else:
+                        print("Using Adam optimizer")
+                        optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                    model = model_factory(training_config)
+
+                    if binary_mode:
+                        model.compile(
+                            loss=tf.keras.losses.BinaryCrossentropy(),
+                            steps_per_execution = 1,
+                            optimizer=optimizer,
+                            metrics=[tf.keras.metrics.BinaryAccuracy()])
+                    else:
+                        model.compile(
+                            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                            steps_per_execution = 1,
+                            optimizer=optimizer,
+                            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+
+                    print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                    model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+
+            training_config["MODEL_NAME"] = model_name
             strategy = reset_tpu(training_config)
-            with strategy.scope():
-                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
-                    print("using AdaBelief optimizer")
-                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
-                else:
-                    print("Using Adam optimizer")
-                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                model = model_factory(training_config)
-
-                if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
-                    model.compile(
-                        loss=tf.keras.losses.BinaryCrossentropy(),
-                        steps_per_execution = 1,
-                        optimizer=optimizer,
-                        metrics=[tf.keras.metrics.BinaryAccuracy()])
-                else:
-                    model.compile(
-                        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                        steps_per_execution = 1,
-                        optimizer=optimizer,
-                        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
-
-                print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-
-        training_config["MODEL_NAME"] = model_name
-
-        for i in range(model_starting_fold, training_config["FOLDS"] + 1):
-            strategy = reset_tpu(training_config)
-            with strategy.scope():
+            
+            for i in range(model_starting_fold, training_config["FOLDS"] + 1):
                 wandb.init(
-                    # Set the project where this run will be logged
-                    project=f"{training_config['WANDB_PROJECT_NAME']}", 
-                    # We pass a run name (otherwise it’ll be randomly assigned, like sunshine-lollypop-10)
+                    project=f"{training_config['WANDB_PROJECT_NAME']}",
                     name=f"{model_name}/Fold_{i}",
-                    # Track hyperparameters and run metadata
                     config=training_config)
 
-            
-                # tf.keras.backend.clear_session()
-                # gc.collect()
-                # strategy = reset_tpu(training_config)
-                # with strategy.scope():
-                # with tf.device("/device:GPU:0"):
                 if(training_config["USE_ADABELIEF_OPTIMIZER"]):
                     optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
                 else:
@@ -176,7 +170,7 @@ def perform_training(models, training_config):
                 print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
                 model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
 
-                if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+                if binary_mode:
                     model.compile(
                         loss=tf.keras.losses.BinaryCrossentropy(),
                         steps_per_execution = training_config['STEPS_PER_EXECUTION'],
@@ -214,34 +208,10 @@ def perform_training(models, training_config):
                     gc.collect()
                     del train_dataset
 
-                    if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+                    if binary_mode:
                         wandb.log({"acc": history.history['val_binary_accuracy'][-1], "loss": history.history['val_loss'][-1]})
                     else:
                         wandb.log({"acc": history.history['val_sparse_categorical_accuracy'][-1], "loss": history.history['val_loss'][-1]})
-
-                    print("Metrics logged, calculating matrix")
-                    if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
-                        true_labels, predictions = get_and_log_predictions(best_model, test_dataset_with_ids)
-                        cm = confusion_matrix(true_labels, np.where(predictions > 0.5, 1, 0))
-                        display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['Spiral', 'Elliptical'])
-                        plot = display.plot()
-                        wandb.log({"Confusion matrix": plt})
-
-                        accuracy = accuracy_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                        precision = precision_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                        recall = recall_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                        f1 = f1_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                        tnr = cm[0][0] / (cm[0][0] + cm[0][1])
-                    else:
-                        true_labels, predictions = get_and_log_predictions_multiclass(best_model, test_dataset_with_ids)
-                        print(true_labels)
-                        print(predictions)
-                        print(np.argmax(predictions, axis= 1))
-                        cm = confusion_matrix(true_labels, np.argmax(predictions, axis= 1))
-                        print(cm)
-                        display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['CertainElliptical', 'UncertainElliptical', 'Unknown', 'UncertainSpiral', 'CertainSpiral'])
-                        plot = display.plot()
-                        wandb.log({"Confusion matrix": plt})
 
                     last_loss = history.history['val_loss'][-1]
                     if (last_loss < best_loss):
@@ -253,17 +223,39 @@ def perform_training(models, training_config):
                     if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
                         break
-                        
-                best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")                
-
-
+                    
+                best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
                 test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test", training_config["TEST_BATCH_SIZE"])
+
+                if binary_mode:
+                    true_labels, predictions = get_and_log_predictions(best_model, test_dataset_with_ids)
+                    cm = confusion_matrix(true_labels, np.where(predictions > 0.5, 1, 0))
+                    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['Spiral', 'Elliptical'])
+                    plot = display.plot()
+                    wandb.log({"Confusion matrix": plt})
+
+                    accuracy = accuracy_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                    precision = precision_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                    recall = recall_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                    f1 = f1_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                    tnr = cm[0][0] / (cm[0][0] + cm[0][1])
+                else:
+                    true_labels, predictions = get_and_log_predictions_multiclass(best_model, test_dataset_with_ids)
+                    cm = confusion_matrix(true_labels, predictions)
+                    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['CertEll', 'UncertEll', 'Unknown', 'UncertSpiral', 'CertSpiral'])
+                    plot = display.plot()
+                    wandb.log({"Confusion matrix": plt})
+
+                    accuracy = accuracy_score(true_labels, predictions)
+                    precision = precision_score(true_labels, predictions, average = None)
+                    recall = recall_score(true_labels, predictions, average = None)
+                    f1 = f1_score(true_labels, predictions, average = None)
+                    tnr = cm[0][0] / (cm[0][0] + cm[0][1])
+                    
+
+                table = wandb.Table(columns = ['accuracy', 'precision', 'recall', 'f1', 'TNR'], data = [[accuracy, precision, recall, f1, tnr]])
+                wandb.log({"metrics" : table})
+                wandb.log({'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1, 'TNR': tnr})
+
                 
-
-
-            table = wandb.Table(columns = ['accuracy', 'precision', 'recall', 'f1', 'TNR'], data = [[accuracy, precision, recall, f1, tnr]])
-            wandb.log({"metrics" : table})
-            wandb.log({'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1, 'TNR': tnr})
-
-            
-            wandb.finish()
+                wandb.finish()
