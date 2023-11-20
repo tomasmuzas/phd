@@ -1,7 +1,7 @@
 import os
 from tensorflow.keras import optimizers
 from .utils import reset_tpu
-from .get_dataset import get_dataset
+from .get_dataset import get_intial_fold_dataset, shuffle_dataset
 import tensorflow as tf
 import json
 from pathlib import Path
@@ -143,6 +143,13 @@ def perform_training(models, training_config):
                     name=f"{model_name}/Fold_{i}",
                     config=training_config)
 
+                print("Getting cached train dataset")
+                cached_initial_training_dataset = get_intial_fold_dataset(
+                    training_config,
+                    f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/train",
+                    training_config["SEED"],
+                    shuffle = True)
+
                 if(training_config["USE_ADABELIEF_OPTIMIZER"]):
                     optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
                 else:
@@ -152,16 +159,20 @@ def perform_training(models, training_config):
                 best_epoch = 0
                 best_loss = 1
 
-                test_dataset = get_dataset(
+                print("Getting test dataset")
+                test_dataset = get_intial_fold_dataset(
                     training_config,
                     f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test",
+                    seed = training_config["SEED"],
+                    shuffle = False)
+
+                test_dataset = shuffle_dataset(
+                    test_dataset,
+                    training_config,
                     training_config["TEST_BATCH_SIZE"],
                     seed = training_config["SEED"],
                     augment = False,
-                    shuffle = False,
                     drop_remainder = training_config["TPU"])
-
-
 
                 if training_config["TPU"]:
                     test_dataset = test_dataset.cache()
@@ -184,13 +195,12 @@ def perform_training(models, training_config):
 
                 for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
 
-                    train_dataset = get_dataset(
+                    train_dataset = shuffle_dataset(
+                        cached_initial_training_dataset,
                         training_config,
-                        f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/train",
                         training_config["TRAIN_BATCH_SIZE"],
                         seed = training_config["SEED"] + epoch,
                         augment = True,
-                        shuffle = True,
                         drop_remainder = False)
 
                     history = model.fit(
