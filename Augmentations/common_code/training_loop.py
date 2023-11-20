@@ -188,7 +188,7 @@ def perform_training(models, training_config):
                         metrics=[tf.keras.metrics.BinaryAccuracy()])
                 else:
                     model.compile(
-                        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                        loss=tf.keras.losses.SparseCategoricalCrossentropy(from_logits = True),
                         steps_per_execution = training_config['STEPS_PER_EXECUTION'],
                         optimizer=optimizer,
                         metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
