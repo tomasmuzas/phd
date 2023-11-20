@@ -233,38 +233,38 @@ def perform_training(models, training_config):
                         print("Early stopping")
                         break
                     
-                best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
-                test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test", training_config["TEST_BATCH_SIZE"])
+                # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
+                # test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test", training_config["TEST_BATCH_SIZE"])
 
-                if binary_mode:
-                    true_labels, predictions = get_and_log_predictions(best_model, test_dataset_with_ids)
-                    cm = confusion_matrix(true_labels, np.where(predictions > 0.5, 1, 0))
-                    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['Spiral', 'Elliptical'])
-                    plot = display.plot()
-                    wandb.log({"Confusion matrix": plt})
+                # if binary_mode:
+                #     true_labels, predictions = get_and_log_predictions(best_model, test_dataset_with_ids)
+                #     cm = confusion_matrix(true_labels, np.where(predictions > 0.5, 1, 0))
+                #     display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['Spiral', 'Elliptical'])
+                #     plot = display.plot()
+                #     wandb.log({"Confusion matrix": plt})
 
-                    accuracy = accuracy_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    precision = precision_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    recall = recall_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    f1 = f1_score(true_labels, np.where(predictions > 0.5, 1, 0))
-                    tnr = cm[0][0] / (cm[0][0] + cm[0][1])
-                else:
-                    true_labels, predictions = get_and_log_predictions_multiclass(best_model, test_dataset_with_ids)
-                    cm = confusion_matrix(true_labels, predictions)
-                    display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['CertEll', 'UncertEll', 'Unknown', 'UncertSpiral', 'CertSpiral'])
-                    plot = display.plot()
-                    wandb.log({"Confusion matrix": plt})
+                #     accuracy = accuracy_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                #     precision = precision_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                #     recall = recall_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                #     f1 = f1_score(true_labels, np.where(predictions > 0.5, 1, 0))
+                #     tnr = cm[0][0] / (cm[0][0] + cm[0][1])
+                # else:
+                #     true_labels, predictions = get_and_log_predictions_multiclass(best_model, test_dataset_with_ids)
+                #     cm = confusion_matrix(true_labels, predictions)
+                #     display = ConfusionMatrixDisplay(confusion_matrix=cm, display_labels= ['CertEll', 'UncertEll', 'Unknown', 'UncertSpiral', 'CertSpiral'])
+                #     plot = display.plot()
+                #     wandb.log({"Confusion matrix": plt})
 
-                    accuracy = accuracy_score(true_labels, predictions)
-                    precision = precision_score(true_labels, predictions, average = None)
-                    recall = recall_score(true_labels, predictions, average = None)
-                    f1 = f1_score(true_labels, predictions, average = None)
-                    tnr = cm[0][0] / (cm[0][0] + cm[0][1])
+                #     accuracy = accuracy_score(true_labels, predictions)
+                #     precision = precision_score(true_labels, predictions, average = None)
+                #     recall = recall_score(true_labels, predictions, average = None)
+                #     f1 = f1_score(true_labels, predictions, average = None)
+                #     tnr = cm[0][0] / (cm[0][0] + cm[0][1])
                     
 
-                table = wandb.Table(columns = ['accuracy', 'precision', 'recall', 'f1', 'TNR'], data = [[accuracy, precision, recall, f1, tnr]])
-                wandb.log({"metrics" : table})
-                wandb.log({'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1, 'TNR': tnr})
+                # table = wandb.Table(columns = ['accuracy', 'precision', 'recall', 'f1', 'TNR'], data = [[accuracy, precision, recall, f1, tnr]])
+                # wandb.log({"metrics" : table})
+                # wandb.log({'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1, 'TNR': tnr})
 
                 
                 wandb.finish()
