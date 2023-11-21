@@ -213,9 +213,8 @@ def perform_training(models, training_config):
                         shuffle = False,
                         workers= 32 if training_config["TPU"] else 1)
 
-                    tf.keras.backend.clear_session()
-                    gc.collect()
                     del train_dataset
+                    gc.collect()
 
                     if binary_mode:
                         wandb.log({"acc": history.history['val_binary_accuracy'][-1], "loss": history.history['val_loss'][-1]})
@@ -269,7 +268,6 @@ def perform_training(models, training_config):
                 wandb.finish()
 
                 del cached_initial_training_dataset
-                del train_dataset
                 del test_dataset
 
                 gc.collect()
