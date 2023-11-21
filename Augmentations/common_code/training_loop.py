@@ -266,5 +266,11 @@ def perform_training(models, training_config):
                 # wandb.log({"metrics" : table})
                 # wandb.log({'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1, 'TNR': tnr})
 
-                
                 wandb.finish()
+
+                del cached_initial_training_dataset
+                del train_dataset
+                del test_dataset
+
+                gc.collect()
+                tf.keras.backend.clear_session()
