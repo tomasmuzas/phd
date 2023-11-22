@@ -158,7 +158,7 @@ def perform_training(models, training_config):
                 print(f"{model_name} FOLD {i}")
 
                 best_epoch = 0
-                best_loss = 1
+                best_loss = 10
 
                 print("Getting test dataset")
                 test_dataset = get_intial_fold_dataset(
