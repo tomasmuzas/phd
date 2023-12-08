@@ -2,7 +2,6 @@ import os
 import numpy as np
 import random
 import tensorflow as tf
-import tensorflow_datasets as tfds
 from tensorflow.keras import Sequential, optimizers
 from tensorflow.keras.applications import ResNet50
 from tensorflow.keras.layers import Dense, Dropout, Flatten, BatchNormalization, Conv2D, Input, MaxPool2D

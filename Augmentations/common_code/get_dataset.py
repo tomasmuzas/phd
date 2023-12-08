@@ -18,9 +18,9 @@ def get_intial_fold_dataset(training_config, path, seed, shuffle):
           "image": tf.io.FixedLenFeature([], dtype=tf.string),
           "class": tf.io.FixedLenFeature([], dtype=tf.int64),
 
-          "label": tf.io.FixedLenFeature([], dtype=tf.string),
+          # "label": tf.io.FixedLenFeature([], dtype=tf.string),
           "objid": tf.io.FixedLenFeature([], dtype=tf.string),
-          "one_hot_class": tf.io.VarLenFeature(tf.float32)
+          # "one_hot_class": tf.io.VarLenFeature(tf.float32)
       }),
       num_parallel_calls=AUTO)
   dataset = dataset.map(lambda item: (tf.reshape(tf.image.decode_jpeg(item['image'], channels=3), [training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3]), item['class']), num_parallel_calls=AUTO)
