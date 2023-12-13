@@ -23,9 +23,7 @@ def get_dataset_with_objids(path, batch_size):
           "image": tf.io.FixedLenFeature([], dtype=tf.string),
           "class": tf.io.FixedLenFeature([], dtype=tf.int64),
 
-          "label": tf.io.FixedLenFeature([], dtype=tf.string),
-          "objid": tf.io.FixedLenFeature([], dtype=tf.string),
-          "one_hot_class": tf.io.VarLenFeature(tf.float32)
+          "objid": tf.io.FixedLenFeature([], dtype=tf.string)
       }),
       num_parallel_calls=AUTO)
   dataset = dataset.map(lambda item: (tf.reshape(tf.image.decode_jpeg(item['image'], channels=3), [128, 128, 3]), item['class'], item['objid']), num_parallel_calls=AUTO)
@@ -106,7 +104,7 @@ def perform_training(models, training_config):
         model_starting_fold = model['starting_fold']
 
         model_path = f"{experiment_path}/{model_name}"
-        initial_model_path = f"models/{image_size}x{image_size}/initial_models/{model_name}"
+        initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
         # Create initial model
         if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
             print("Creating new weights")
