@@ -13,7 +13,7 @@ def create_ResNet50(training_config):
     include_top = False,
     weights = None,
     pooling = 'avg'))
-  if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+  if training_config["NUMBER_OF_CLASSES"] == None:
     model.add(Dense(1, activation='sigmoid'))
   else:
     model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
@@ -49,7 +49,7 @@ def Dieleman(training_config):
     model.add(Dropout(0.5))
   model.add(Dense(256,activation='relu'))
   model.add(Dense(256,activation='relu'))
-  if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+  if training_config["NUMBER_OF_CLASSES"] == None:
     model.add(Dense(1, activation='sigmoid'))
   else:
     model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
@@ -65,7 +65,7 @@ def SimpleModel(training_config):
   model.add(Conv2D(filters=16, kernel_size=5, activation='relu'))
   model.add(Dropout(0.5))
   model.add(Flatten())
-  if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+  if training_config["NUMBER_OF_CLASSES"] == None:
     model.add(Dense(1, activation='sigmoid'))
   else:
     model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
@@ -91,7 +91,7 @@ def Cavanagh(training_config):
     model.add(Dropout(0.5))
   model.add(Dense(256,activation='relu'))
   model.add(Dense(256,activation='relu'))
-  if training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2:
+  if training_config["NUMBER_OF_CLASSES"] == None:
     model.add(Dense(1, activation='sigmoid'))
   else:
     model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))

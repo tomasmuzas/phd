@@ -81,7 +81,7 @@ def get_and_log_predictions_multiclass(model, dataset):
 
 def perform_training(models, training_config):
 
-    binary_mode = training_config["NUMBER_OF_CLASSES"] == None or training_config["NUMBER_OF_CLASSES"] == 2
+    binary_mode = training_config["NUMBER_OF_CLASSES"] == None
 
     if training_config["TPU"] and not os.path.isdir("gcs"):
         raise Exception("local GCS folder must be mounted!")
@@ -136,6 +136,10 @@ def perform_training(models, training_config):
         strategy = reset_tpu(training_config)
         
         for i in range(model_starting_fold, training_config["FOLDS"] + 1):
+            if(os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")):
+                print(f"{model_name.title()}, {training_config['EXPERIMENT_DESCRIPTION']}, FOLD {i} already exists, SKIPPING IT.")
+                continue
+
             with strategy.scope():
                 wandb.init(
                     project=f"{training_config['WANDB_PROJECT_NAME']}",
