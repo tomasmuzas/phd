@@ -249,12 +249,13 @@ def perform_training(models, training_config):
                         print("Early stopping")
                         break
                 
-            del cached_initial_training_dataset
-            del test_dataset
-            del model
+                del cached_initial_training_dataset
+                del test_dataset
+                del model
 
-            gc.collect()
-            tf.keras.backend.clear_session()
+                gc.collect()
+                tf.keras.backend.clear_session()
+                tf.tpu.experimental.shutdown_tpu_system()
             # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
             # test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test", training_config["TEST_BATCH_SIZE"])
 
