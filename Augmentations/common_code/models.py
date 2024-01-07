@@ -31,6 +31,8 @@ def create_EffNetV2L(training_config):
     model.add(Dense(1, activation='sigmoid'))
   else:
     model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
+  
+  return model
 
 def create_EffNetB7(training_config):
   model = Sequential()
