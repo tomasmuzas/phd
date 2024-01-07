@@ -19,6 +19,19 @@ def create_ResNet50(training_config):
     model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
   return model
 
+def create_EffNetV2L(training_config):
+  model = Sequential()
+  model.add(tf.keras.applications.efficientnet_v2.EfficientNetV2L(
+    input_shape = (training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3),
+    include_top = False,
+    weights = None,
+    include_preprocessing=False,
+    pooling = 'avg'))
+  if training_config["NUMBER_OF_CLASSES"] == None:
+    model.add(Dense(1, activation='sigmoid'))
+  else:
+    model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
+
 def create_EffNetB7(training_config):
   model = Sequential()
   model.add(tf.keras.applications.efficientnet.EfficientNetB7(
@@ -26,7 +39,10 @@ def create_EffNetB7(training_config):
     include_top = False,
     weights = None,
     pooling = 'avg'))
-  model.add(Dense(1, activation='sigmoid'))
+  if training_config["NUMBER_OF_CLASSES"] == None:
+    model.add(Dense(1, activation='sigmoid'))
+  else:
+    model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
   return model
 
 def Dieleman(training_config):
