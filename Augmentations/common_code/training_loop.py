@@ -247,14 +247,15 @@ def perform_training(models, training_config):
                     if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
                         break
-                
-                del cached_initial_training_dataset
-                del test_dataset
-                del model
-
-                gc.collect()
-                tf.keras.backend.clear_session()
-                tf.tpu.experimental.shutdown_tpu_system()
+            
+            tf.tpu.experimental.shutdown_tpu_system()
+            tf.keras.backend.clear_session()
+            del cached_initial_training_dataset
+            del test_dataset
+            del model
+            gc.collect()
+            
+            
             # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
             # test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test", training_config["TEST_BATCH_SIZE"])
 
