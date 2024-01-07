@@ -248,7 +248,6 @@ def perform_training(models, training_config):
                         print("Early stopping")
                         break
             
-            tf.tpu.experimental.shutdown_tpu_system()
             tf.keras.backend.clear_session()
             del cached_initial_training_dataset
             del test_dataset
