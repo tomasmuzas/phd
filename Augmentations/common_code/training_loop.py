@@ -251,6 +251,7 @@ def perform_training(models, training_config):
                 
             del cached_initial_training_dataset
             del test_dataset
+            del model
 
             gc.collect()
             tf.keras.backend.clear_session()
