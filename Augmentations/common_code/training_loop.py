@@ -227,8 +227,7 @@ def perform_training(models, training_config):
                         steps_per_epoch = training_config["TRAIN_DATASET_SIZE"] // training_config["TRAIN_BATCH_SIZE"],
                         validation_steps = training_config["TEST_DATASET_SIZE"] // training_config["TEST_BATCH_SIZE"],
                         verbose = 1,
-                        shuffle = False,
-                        workers= 32 if training_config["TPU"] else 1)
+                        shuffle = False)
 
                     del train_dataset
                     gc.collect()
