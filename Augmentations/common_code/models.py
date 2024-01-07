@@ -19,9 +19,9 @@ def create_ResNet50(training_config):
     model.add(Dense(training_config["NUMBER_OF_CLASSES"], activation='softmax'))
   return model
 
-def create_EffNetV2L(training_config):
+def create_EffNetV2S(training_config):
   model = Sequential()
-  model.add(tf.keras.applications.efficientnet_v2.EfficientNetV2L(
+  model.add(tf.keras.applications.efficientnet_v2.EfficientNetV2S(
     input_shape = (training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3),
     include_top = False,
     weights = None,
