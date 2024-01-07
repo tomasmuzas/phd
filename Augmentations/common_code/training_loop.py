@@ -14,8 +14,22 @@ import gc
 
 AUTO = tf.data.AUTOTUNE
 
+def get_objids_only(path, batch_size):
+  dataset = tf.data.TFRecordDataset(sorted(tf.io.gfile.glob(path + "/*.tfrec")), num_parallel_reads=AUTO) # if TPU else 20)
+
+  dataset = dataset.map(lambda records: tf.io.parse_single_example(
+      records,
+      {
+          "class": tf.io.FixedLenFeature([], dtype=tf.int64),
+          "objid": tf.io.FixedLenFeature([], dtype=tf.string)
+      }),
+      num_parallel_calls=AUTO)
+  dataset = dataset.map(lambda item: (item['class'], item['objid']), num_parallel_calls=AUTO)
+  dataset = dataset.batch(batch_size, drop_remainder=False)
+  return dataset
+
 def get_dataset_with_objids(path, batch_size):
-  dataset = tf.data.TFRecordDataset(tf.io.gfile.glob(path + "/*.tfrec"), num_parallel_reads=AUTO) # if TPU else 20)
+  dataset = tf.data.TFRecordDataset(sorted(tf.io.gfile.glob(path + "/*.tfrec")), num_parallel_reads=AUTO) # if TPU else 20)
 
   dataset = dataset.map(lambda records: tf.io.parse_single_example(
       records,
@@ -29,7 +43,7 @@ def get_dataset_with_objids(path, batch_size):
   dataset = dataset.map(lambda item: (tf.reshape(tf.image.decode_jpeg(item['image'], channels=3), [128, 128, 3]), item['class'], item['objid']), num_parallel_calls=AUTO)
   dataset = dataset.map(lambda x,y,z: (tf.cast(x, tf.float32), y, z), num_parallel_calls=AUTO)
   dataset = dataset.map(lambda x,y,z: (tf.keras.layers.Rescaling(scale=1./255)(x), y, z), num_parallel_calls=AUTO)
-  dataset = dataset.batch(batch_size, drop_remainder=False).prefetch(200)
+  dataset = dataset.batch(batch_size, drop_remainder=False)
   return dataset
 
 
