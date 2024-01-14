@@ -112,7 +112,7 @@ def perform_training(models, training_config):
     
     os.environ["WANDB_SILENT"] = "true"
 
-    for fold in range(model_starting_fold, training_config["FOLDS"] + 1):
+    for fold in range(1, training_config["FOLDS"] + 1):
 
         # Fetch and cache training dataset for the fold
         print(f"Getting test dataset for fold {fold}")
@@ -150,7 +150,6 @@ def perform_training(models, training_config):
         for model in models:
             model_name = model['name']
             model_factory = model['func']
-            model_starting_fold = model['starting_fold']
 
             model_path = f"{experiment_path}/{model_name}"
             initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
