@@ -11,6 +11,8 @@ import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, accuracy_score, f1_score, precision_score, recall_score
 import matplotlib.pyplot as plt
 import gc
+import pandas as pd
+from tqdm.notebook import tqdm
 
 AUTO = tf.data.AUTOTUNE
 
@@ -110,89 +112,97 @@ def perform_training(models, training_config):
     
     os.environ["WANDB_SILENT"] = "true"
 
-    strategy = reset_tpu(training_config)
+    for fold in range(model_starting_fold, training_config["FOLDS"] + 1):
 
-    for model in models:
-        model_name = model['name']
-        model_factory = model['func']
-        model_starting_fold = model['starting_fold']
+        # Fetch and cache training dataset for the fold
+        print(f"Getting test dataset for fold {fold}")
+        test_dataset = get_intial_fold_dataset(
+            training_config,
+            f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test",
+            seed = training_config["SEED"],
+            shuffle = False)
 
-        model_path = f"{experiment_path}/{model_name}"
-        initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
-        # Create initial model
-        if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
-            print("Creating new weights")
-            if(training_config["USE_ADABELIEF_OPTIMIZER"]):
-                print("using AdaBelief optimizer")
-                optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
-            else:
-                print("Using Adam optimizer")
-                optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-            model = model_factory(training_config)
+        test_dataset = shuffle_dataset(
+            test_dataset,
+            training_config,
+            training_config["TEST_BATCH_SIZE"],
+            seed = training_config["SEED"],
+            augment = False,
+            drop_remainder = training_config["TPU"])
 
-            if binary_mode:
-                model.compile(
-                    loss=tf.keras.losses.BinaryCrossentropy(),
-                    steps_per_execution = 1,
-                    optimizer=optimizer,
-                    metrics=[tf.keras.metrics.BinaryAccuracy()])
-            else:
-                model.compile(
-                    loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                    steps_per_execution = 1,
-                    optimizer=optimizer,
-                    metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+        if training_config["TPU"]:
+            test_dataset = test_dataset.cache()
 
-            print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-            model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+        print("Getting cached test dataset with objids")
+        test_dataset_with_objids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", 1024)
+        test_dataset_with_objids = test_dataset_with_objids.cache()
 
-        training_config["MODEL_NAME"] = model_name
-        strategy = reset_tpu(training_config)
-        
-        for i in range(model_starting_fold, training_config["FOLDS"] + 1):
-            if(os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")):
-                print(f"{model_name.title()}, {training_config['EXPERIMENT_DESCRIPTION']}, FOLD {i} already exists, SKIPPING IT.")
+        print("Getting cached train dataset base")
+        cached_initial_training_dataset = get_intial_fold_dataset(
+            training_config,
+            f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/train",
+            training_config["SEED"],
+            shuffle = True)
+
+
+
+        # Begin training for each model
+        for model in models:
+            model_name = model['name']
+            model_factory = model['func']
+            model_starting_fold = model['starting_fold']
+
+            model_path = f"{experiment_path}/{model_name}"
+            initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
+
+            # Create initial model
+            if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
+                print("Creating new weights")
+                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                    print("using AdaBelief optimizer")
+                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                else:
+                    print("Using Adam optimizer")
+                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                model = model_factory(training_config)
+
+                if binary_mode:
+                    model.compile(
+                        loss=tf.keras.losses.BinaryCrossentropy(),
+                        steps_per_execution = 1,
+                        optimizer=optimizer,
+                        metrics=[tf.keras.metrics.BinaryAccuracy()])
+                else:
+                    model.compile(
+                        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                        steps_per_execution = 1,
+                        optimizer=optimizer,
+                        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+
+                print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+
+            training_config["MODEL_NAME"] = model_name
+            
+            if(os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")):
+                print(f"{model_name.title()}, {training_config['EXPERIMENT_DESCRIPTION']}, FOLD {fold} already exists, SKIPPING IT.")
                 continue
 
+            strategy = reset_tpu(training_config)
             with strategy.scope():
                 wandb.init(
                     project=f"{training_config['WANDB_PROJECT_NAME']}",
-                    name=f"{model_name}/Fold_{i}",
+                    name=f"{model_name}/Fold_{fold}",
                     config=training_config)
-
-                print("Getting cached train dataset")
-                cached_initial_training_dataset = get_intial_fold_dataset(
-                    training_config,
-                    f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/train",
-                    training_config["SEED"],
-                    shuffle = True)
 
                 if(training_config["USE_ADABELIEF_OPTIMIZER"]):
                     optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
                 else:
                     optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                print(f"{model_name} FOLD {i}")
+                print(f"{model_name} FOLD {fold}")
 
                 best_epoch = 0
                 best_loss = 10
-
-                print("Getting test dataset")
-                test_dataset = get_intial_fold_dataset(
-                    training_config,
-                    f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test",
-                    seed = training_config["SEED"],
-                    shuffle = False)
-
-                test_dataset = shuffle_dataset(
-                    test_dataset,
-                    training_config,
-                    training_config["TEST_BATCH_SIZE"],
-                    seed = training_config["SEED"],
-                    augment = False,
-                    drop_remainder = training_config["TPU"])
-
-                if training_config["TPU"]:
-                    test_dataset = test_dataset.cache()
 
                 print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
                 model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
@@ -242,21 +252,48 @@ def perform_training(models, training_config):
                         print("Loss improved. Saving model.")
                         best_epoch = epoch
                         best_loss = last_loss
-                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
+                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
 
                     if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
+                        tf.keras.backend.clear_session()
+                        del model                
+                        gc.collect()
+
+                        print("Getting final predictions with objids")
+                        model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+
+                        galaxy_ids = np.empty([0, 1], dtype=str)
+                        true_labels = np.empty([0, 1], dtype=float)
+                        predictions = np.empty([0, 1], dtype=float)
+
+                        for images, labels, objids in tqdm(test_dataset_with_objids, total = training_config["TEST_DATASET_SIZE"] // 1024 + 1):
+                            results = model(images, training=False)
+                            galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
+                            true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
+                            predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
+
+                        prediction_dataframe = pd.DataFrame({
+                            "Id": galaxy_ids.numpy().astype(str).reshape((-1)),
+                            "True": true_labels.numpy().reshape((-1)),
+                            "Prediction": predictions.numpy().reshape((-1))
+                        })
+
+                        prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
+
                         break
+                
+                wandb.finish()
+
+                tf.keras.backend.clear_session()
+                del model                
+                gc.collect()
+
+        del cached_initial_training_dataset
+        gc.collect()
             
-            tf.keras.backend.clear_session()
-            del cached_initial_training_dataset
-            del test_dataset
-            del model
-            gc.collect()
-            
-            
-            # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{i}")
-            # test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{i}/test", training_config["TEST_BATCH_SIZE"])
+            # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+            # test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", training_config["TEST_BATCH_SIZE"])
 
             # if binary_mode:
             #     true_labels, predictions = get_and_log_predictions(best_model, test_dataset_with_ids)
@@ -288,5 +325,5 @@ def perform_training(models, training_config):
             # wandb.log({"metrics" : table})
             # wandb.log({'accuracy': accuracy, 'precision': precision, 'recall': recall, 'f1': f1, 'TNR': tnr})
 
-            wandb.finish()
+            
 
