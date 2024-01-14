@@ -110,186 +110,188 @@ def perform_training(models, training_config):
     image_size = training_config["IMAGE_SIZE"]
     experiment_path = f"models/{image_size}x{image_size}/experiments/{training_config['EXPERIMENT_DESCRIPTION']}"
     
-    os.environ["WANDB_SILENT"] = "true"
+    os.environ["WANDB_SILENT"] = "True"
 
     for fold in range(1, training_config["FOLDS"] + 1):
 
-        # Fetch and cache training dataset for the fold
-        print(f"Getting test dataset for fold {fold}")
-        test_dataset = get_intial_fold_dataset(
-            training_config,
-            f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test",
-            seed = training_config["SEED"],
-            shuffle = False)
+        strategy = reset_tpu(training_config)
+        with strategy.scope():
 
-        test_dataset = shuffle_dataset(
-            test_dataset,
-            training_config,
-            training_config["TEST_BATCH_SIZE"],
-            seed = training_config["SEED"],
-            augment = False,
-            drop_remainder = training_config["TPU"])
+            # Fetch and cache training dataset for the fold
+            print(f"Getting test dataset for fold {fold}")
+            test_dataset = get_intial_fold_dataset(
+                training_config,
+                f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test",
+                seed = training_config["SEED"],
+                shuffle = False)
 
-        if training_config["TPU"]:
-            test_dataset = test_dataset.cache()
+            test_dataset = shuffle_dataset(
+                test_dataset,
+                training_config,
+                training_config["TEST_BATCH_SIZE"],
+                seed = training_config["SEED"],
+                augment = False,
+                drop_remainder = training_config["TPU"])
 
-        print("Getting cached test dataset with objids")
-        test_dataset_with_objids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", 1024)
-        test_dataset_with_objids = test_dataset_with_objids.cache()
+            if training_config["TPU"]:
+                test_dataset = test_dataset.cache()
 
-        print("Getting cached train dataset base")
-        cached_initial_training_dataset = get_intial_fold_dataset(
-            training_config,
-            f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/train",
-            training_config["SEED"],
-            shuffle = True)
+            print("Getting cached test dataset with objids")
+            test_dataset_with_objids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", 1024)
+            test_dataset_with_objids = test_dataset_with_objids.cache()
+
+            print("Getting cached train dataset base")
+            cached_initial_training_dataset = get_intial_fold_dataset(
+                training_config,
+                f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/train",
+                training_config["SEED"],
+                shuffle = True)
 
 
 
-        # Begin training for each model
-        for model in models:
-            model_name = model['name']
-            model_factory = model['func']
+            # Begin training for each model
+            for model in models:
+                model_name = model['name']
+                model_factory = model['func']
 
-            model_path = f"{experiment_path}/{model_name}"
-            initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
+                model_path = f"{experiment_path}/{model_name}"
+                initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
 
-            # Create initial model
-            if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
-                print("Creating new weights")
-                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
-                    print("using AdaBelief optimizer")
-                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
-                else:
-                    print("Using Adam optimizer")
-                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                model = model_factory(training_config)
-
-                if binary_mode:
-                    model.compile(
-                        loss=tf.keras.losses.BinaryCrossentropy(),
-                        steps_per_execution = 1,
-                        optimizer=optimizer,
-                        metrics=[tf.keras.metrics.BinaryAccuracy()])
-                else:
-                    model.compile(
-                        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                        steps_per_execution = 1,
-                        optimizer=optimizer,
-                        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
-
-                print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-
-            training_config["MODEL_NAME"] = model_name
-            
-            if(os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")):
-                print(f"{model_name.title()}, {training_config['EXPERIMENT_DESCRIPTION']}, FOLD {fold} already exists, SKIPPING IT.")
-                continue
-
-            strategy = reset_tpu(training_config)
-            with strategy.scope():
-                wandb.init(
-                    project=f"{training_config['WANDB_PROJECT_NAME']}",
-                    name=f"{model_name}/Fold_{fold}",
-                    config=training_config)
-
-                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
-                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
-                else:
-                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                print(f"{model_name} FOLD {fold}")
-
-                best_epoch = 0
-                best_loss = 10
-
-                print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-
-                if binary_mode:
-                    model.compile(
-                        loss=tf.keras.losses.BinaryCrossentropy(),
-                        steps_per_execution = training_config['STEPS_PER_EXECUTION'],
-                        optimizer=optimizer,
-                        metrics=[tf.keras.metrics.BinaryAccuracy()])
-                else:
-                    model.compile(
-                        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                        steps_per_execution = training_config['STEPS_PER_EXECUTION'],
-                        optimizer=optimizer,
-                        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
-
-                for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
-
-                    train_dataset = shuffle_dataset(
-                        cached_initial_training_dataset,
-                        training_config,
-                        training_config["TRAIN_BATCH_SIZE"],
-                        seed = training_config["SEED"] + epoch,
-                        augment = True,
-                        drop_remainder = False)
-
-                    history = model.fit(
-                        x= train_dataset,
-                        validation_data = test_dataset,
-                        epochs = 1,
-                        steps_per_epoch = training_config["TRAIN_DATASET_SIZE"] // training_config["TRAIN_BATCH_SIZE"],
-                        validation_steps = training_config["TEST_DATASET_SIZE"] // training_config["TEST_BATCH_SIZE"],
-                        verbose = 1,
-                        shuffle = False)
-
-                    del train_dataset
-                    gc.collect()
+                # Create initial model
+                if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
+                    print("Creating new weights")
+                    if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                        print("using AdaBelief optimizer")
+                        optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                    else:
+                        print("Using Adam optimizer")
+                        optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                    model = model_factory(training_config)
 
                     if binary_mode:
-                        wandb.log({"acc": history.history['val_binary_accuracy'][-1], "loss": history.history['val_loss'][-1]})
+                        model.compile(
+                            loss=tf.keras.losses.BinaryCrossentropy(),
+                            steps_per_execution = 1,
+                            optimizer=optimizer,
+                            metrics=[tf.keras.metrics.BinaryAccuracy()])
                     else:
-                        wandb.log({"acc": history.history['val_sparse_categorical_accuracy'][-1], "loss": history.history['val_loss'][-1]})
+                        model.compile(
+                            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                            steps_per_execution = 1,
+                            optimizer=optimizer,
+                            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
 
-                    last_loss = history.history['val_loss'][-1]
-                    if (last_loss < best_loss):
-                        print("Loss improved. Saving model.")
-                        best_epoch = epoch
-                        best_loss = last_loss
-                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+                    print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                    model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
 
-                    if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
-                        print("Early stopping")
-                        tf.keras.backend.clear_session()
-                        del model                
+                training_config["MODEL_NAME"] = model_name
+                
+                if(os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")):
+                    print(f"{model_name.title()}, {training_config['EXPERIMENT_DESCRIPTION']}, FOLD {fold} already exists, SKIPPING IT.")
+                    continue
+
+
+                    wandb.init(
+                        project=f"{training_config['WANDB_PROJECT_NAME']}",
+                        name=f"{model_name}/Fold_{fold}",
+                        config=training_config)
+
+                    if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                        optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                    else:
+                        optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                    print(f"{model_name} FOLD {fold}")
+
+                    best_epoch = 0
+                    best_loss = 10
+
+                    print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                    model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+
+                    if binary_mode:
+                        model.compile(
+                            loss=tf.keras.losses.BinaryCrossentropy(),
+                            steps_per_execution = training_config['STEPS_PER_EXECUTION'],
+                            optimizer=optimizer,
+                            metrics=[tf.keras.metrics.BinaryAccuracy()])
+                    else:
+                        model.compile(
+                            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                            steps_per_execution = training_config['STEPS_PER_EXECUTION'],
+                            optimizer=optimizer,
+                            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+
+                    for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
+
+                        train_dataset = shuffle_dataset(
+                            cached_initial_training_dataset,
+                            training_config,
+                            training_config["TRAIN_BATCH_SIZE"],
+                            seed = training_config["SEED"] + epoch,
+                            augment = True,
+                            drop_remainder = False)
+
+                        history = model.fit(
+                            x= train_dataset,
+                            validation_data = test_dataset,
+                            epochs = 1,
+                            steps_per_epoch = training_config["TRAIN_DATASET_SIZE"] // training_config["TRAIN_BATCH_SIZE"],
+                            validation_steps = training_config["TEST_DATASET_SIZE"] // training_config["TEST_BATCH_SIZE"],
+                            verbose = 1,
+                            shuffle = False)
+
+                        del train_dataset
                         gc.collect()
 
-                        print("Getting final predictions with objids")
-                        model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+                        if binary_mode:
+                            wandb.log({"acc": history.history['val_binary_accuracy'][-1], "loss": history.history['val_loss'][-1]})
+                        else:
+                            wandb.log({"acc": history.history['val_sparse_categorical_accuracy'][-1], "loss": history.history['val_loss'][-1]})
 
-                        galaxy_ids = np.empty([0, 1], dtype=str)
-                        true_labels = np.empty([0, 1], dtype=float)
-                        predictions = np.empty([0, 1], dtype=float)
+                        last_loss = history.history['val_loss'][-1]
+                        if (last_loss < best_loss):
+                            print("Loss improved. Saving model.")
+                            best_epoch = epoch
+                            best_loss = last_loss
+                            model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
 
-                        for images, labels, objids in tqdm(test_dataset_with_objids, total = training_config["TEST_DATASET_SIZE"] // 1024 + 1):
-                            results = model(images, training=False)
-                            galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
-                            true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
-                            predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
+                        if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
+                            print("Early stopping")
+                            tf.keras.backend.clear_session()
+                            del model                
+                            gc.collect()
 
-                        prediction_dataframe = pd.DataFrame({
-                            "Id": galaxy_ids.numpy().astype(str).reshape((-1)),
-                            "True": true_labels.numpy().reshape((-1)),
-                            "Prediction": predictions.numpy().reshape((-1))
-                        })
+                            print("Getting final predictions with objids")
+                            model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
 
-                        prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
+                            galaxy_ids = np.empty([0, 1], dtype=str)
+                            true_labels = np.empty([0, 1], dtype=float)
+                            predictions = np.empty([0, 1], dtype=float)
 
-                        break
-                
-                wandb.finish()
+                            for images, labels, objids in tqdm(test_dataset_with_objids, total = training_config["TEST_DATASET_SIZE"] // 1024 + 1):
+                                results = model(images, training=False)
+                                galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
+                                true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
+                                predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
 
-                tf.keras.backend.clear_session()
-                del model                
-                gc.collect()
+                            prediction_dataframe = pd.DataFrame({
+                                "Id": galaxy_ids.numpy().astype(str).reshape((-1)),
+                                "True": true_labels.numpy().reshape((-1)),
+                                "Prediction": predictions.numpy().reshape((-1))
+                            })
 
-        del cached_initial_training_dataset
-        gc.collect()
+                            prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
+
+                            break
+                    
+                    wandb.finish()
+
+                    tf.keras.backend.clear_session()
+                    del model                
+                    gc.collect()
+
+            del cached_initial_training_dataset
+            gc.collect()
             
             # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
             # test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", training_config["TEST_BATCH_SIZE"])
