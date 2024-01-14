@@ -252,16 +252,13 @@ def perform_training(models, training_config):
                         print("Loss improved. Saving model.")
                         best_epoch = epoch
                         best_loss = last_loss
-                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+                        model.save_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
 
                     if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
-                        tf.keras.backend.clear_session()
-                        del model                
-                        gc.collect()
 
                         print("Getting final predictions with objids")
-                        model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+                        model = model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
 
                         galaxy_ids = np.empty([0, 1], dtype=str)
                         true_labels = np.empty([0, 1], dtype=float)
@@ -281,7 +278,6 @@ def perform_training(models, training_config):
 
                         prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
                         
-                        tf.keras.backend.clear_session()
                         del model
                         gc.collect()
 
@@ -289,6 +285,7 @@ def perform_training(models, training_config):
                 
                 wandb.finish()
 
+            tf.keras.backend.clear_session()
             del cached_initial_training_dataset
             del test_dataset
             del test_dataset_with_objids
