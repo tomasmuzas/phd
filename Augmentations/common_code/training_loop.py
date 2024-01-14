@@ -148,7 +148,6 @@ def perform_training(models, training_config):
                 shuffle = True)
 
 
-
             # Begin training for each model
             for model in models:
                 model_name = model['name']
@@ -191,106 +190,108 @@ def perform_training(models, training_config):
                     continue
 
 
-                    wandb.init(
-                        project=f"{training_config['WANDB_PROJECT_NAME']}",
-                        name=f"{model_name}/Fold_{fold}",
-                        config=training_config)
+                wandb.init(
+                    project=f"{training_config['WANDB_PROJECT_NAME']}",
+                    name=f"{model_name}/Fold_{fold}",
+                    config=training_config)
 
-                    if(training_config["USE_ADABELIEF_OPTIMIZER"]):
-                        optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
-                    else:
-                        optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                    print(f"{model_name} FOLD {fold}")
+                if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                    optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                else:
+                    optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                print(f"{model_name} FOLD {fold}")
 
-                    best_epoch = 0
-                    best_loss = 10
+                best_epoch = 0
+                best_loss = 10
 
-                    print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                    model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
 
-                    if binary_mode:
-                        model.compile(
-                            loss=tf.keras.losses.BinaryCrossentropy(),
-                            steps_per_execution = training_config['STEPS_PER_EXECUTION'],
-                            optimizer=optimizer,
-                            metrics=[tf.keras.metrics.BinaryAccuracy()])
-                    else:
-                        model.compile(
-                            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                            steps_per_execution = training_config['STEPS_PER_EXECUTION'],
-                            optimizer=optimizer,
-                            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+                if binary_mode:
+                    model.compile(
+                        loss=tf.keras.losses.BinaryCrossentropy(),
+                        steps_per_execution = training_config['STEPS_PER_EXECUTION'],
+                        optimizer=optimizer,
+                        metrics=[tf.keras.metrics.BinaryAccuracy()])
+                else:
+                    model.compile(
+                        loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                        steps_per_execution = training_config['STEPS_PER_EXECUTION'],
+                        optimizer=optimizer,
+                        metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
 
-                    for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
+                for epoch in range(training_config["NUMBER_OF_EPOCHS"]):
 
-                        train_dataset = shuffle_dataset(
-                            cached_initial_training_dataset,
-                            training_config,
-                            training_config["TRAIN_BATCH_SIZE"],
-                            seed = training_config["SEED"] + epoch,
-                            augment = True,
-                            drop_remainder = False)
+                    train_dataset = shuffle_dataset(
+                        cached_initial_training_dataset,
+                        training_config,
+                        training_config["TRAIN_BATCH_SIZE"],
+                        seed = training_config["SEED"] + epoch,
+                        augment = True,
+                        drop_remainder = False)
 
-                        history = model.fit(
-                            x= train_dataset,
-                            validation_data = test_dataset,
-                            epochs = 1,
-                            steps_per_epoch = training_config["TRAIN_DATASET_SIZE"] // training_config["TRAIN_BATCH_SIZE"],
-                            validation_steps = training_config["TEST_DATASET_SIZE"] // training_config["TEST_BATCH_SIZE"],
-                            verbose = 1,
-                            shuffle = False)
+                    history = model.fit(
+                        x= train_dataset,
+                        validation_data = test_dataset,
+                        epochs = 1,
+                        steps_per_epoch = training_config["TRAIN_DATASET_SIZE"] // training_config["TRAIN_BATCH_SIZE"],
+                        validation_steps = training_config["TEST_DATASET_SIZE"] // training_config["TEST_BATCH_SIZE"],
+                        verbose = 1,
+                        shuffle = False)
 
-                        del train_dataset
-                        gc.collect()
-
-                        if binary_mode:
-                            wandb.log({"acc": history.history['val_binary_accuracy'][-1], "loss": history.history['val_loss'][-1]})
-                        else:
-                            wandb.log({"acc": history.history['val_sparse_categorical_accuracy'][-1], "loss": history.history['val_loss'][-1]})
-
-                        last_loss = history.history['val_loss'][-1]
-                        if (last_loss < best_loss):
-                            print("Loss improved. Saving model.")
-                            best_epoch = epoch
-                            best_loss = last_loss
-                            model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
-
-                        if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
-                            print("Early stopping")
-                            tf.keras.backend.clear_session()
-                            del model                
-                            gc.collect()
-
-                            print("Getting final predictions with objids")
-                            model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
-
-                            galaxy_ids = np.empty([0, 1], dtype=str)
-                            true_labels = np.empty([0, 1], dtype=float)
-                            predictions = np.empty([0, 1], dtype=float)
-
-                            for images, labels, objids in tqdm(test_dataset_with_objids, total = training_config["TEST_DATASET_SIZE"] // 1024 + 1):
-                                results = model(images, training=False)
-                                galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
-                                true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
-                                predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
-
-                            prediction_dataframe = pd.DataFrame({
-                                "Id": galaxy_ids.numpy().astype(str).reshape((-1)),
-                                "True": true_labels.numpy().reshape((-1)),
-                                "Prediction": predictions.numpy().reshape((-1))
-                            })
-
-                            prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
-
-                            break
-                    
-                    wandb.finish()
-
-                    tf.keras.backend.clear_session()
-                    del model                
+                    del train_dataset
                     gc.collect()
 
+                    if binary_mode:
+                        wandb.log({"acc": history.history['val_binary_accuracy'][-1], "loss": history.history['val_loss'][-1]})
+                    else:
+                        wandb.log({"acc": history.history['val_sparse_categorical_accuracy'][-1], "loss": history.history['val_loss'][-1]})
+
+                    last_loss = history.history['val_loss'][-1]
+                    if (last_loss < best_loss):
+                        print("Loss improved. Saving model.")
+                        best_epoch = epoch
+                        best_loss = last_loss
+                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+
+                    if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
+                        print("Early stopping")
+                        tf.keras.backend.clear_session()
+                        del model                
+                        gc.collect()
+
+                        print("Getting final predictions with objids")
+                        model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+
+                        galaxy_ids = np.empty([0, 1], dtype=str)
+                        true_labels = np.empty([0, 1], dtype=float)
+                        predictions = np.empty([0, 1], dtype=float)
+
+                        for images, labels, objids in tqdm(test_dataset_with_objids, total = training_config["TEST_DATASET_SIZE"] // 1024 + 1):
+                            results = model(images, training=False)
+                            galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
+                            true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
+                            predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
+
+                        prediction_dataframe = pd.DataFrame({
+                            "Id": galaxy_ids.numpy().astype(str).reshape((-1)),
+                            "True": true_labels.numpy().reshape((-1)),
+                            "Prediction": predictions.numpy().reshape((-1))
+                        })
+
+                        prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
+                        
+                        tf.keras.backend.clear_session()
+                        del model
+                        gc.collect()
+
+                        break
+                
+                wandb.finish()
+
             del cached_initial_training_dataset
+            del test_dataset
+            del test_dataset_with_objids
             gc.collect()
             
             # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
