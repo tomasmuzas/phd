@@ -13,6 +13,9 @@ import matplotlib.pyplot as plt
 import gc
 import pandas as pd
 from tqdm.notebook import tqdm
+from datetime import datetime
+
+
 
 AUTO = tf.data.AUTOTUNE
 
@@ -185,7 +188,7 @@ def perform_training(models, training_config):
 
                 training_config["MODEL_NAME"] = model_name
                 
-                if(os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")):
+                if(os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/finished.txt")):
                     print(f"{model_name.title()}, {training_config['EXPERIMENT_DESCRIPTION']}, FOLD {fold} already exists, SKIPPING IT.")
                     continue
 
@@ -257,29 +260,33 @@ def perform_training(models, training_config):
                     if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
 
-                        print("Getting final predictions with objids")
-                        model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+                        # print("Getting final predictions with objids")
+                        # model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
 
-                        galaxy_ids = np.empty([0, 1], dtype=str)
-                        true_labels = np.empty([0, 1], dtype=float)
-                        predictions = np.empty([0, 1], dtype=float)
+                        # galaxy_ids = np.empty([0, 1], dtype=str)
+                        # true_labels = np.empty([0, 1], dtype=float)
+                        # predictions = np.empty([0, 1], dtype=float)
 
-                        for images, labels, objids in tqdm(test_dataset_with_objids, total = training_config["TEST_DATASET_SIZE"] // 1024 + 1):
-                            results = model(images, training=False)
-                            galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
-                            true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
-                            predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
+                        # for images, labels, objids in tqdm(test_dataset_with_objids, total = training_config["TEST_DATASET_SIZE"] // 1024 + 1):
+                        #     results = model(images, training=False)
+                        #     galaxy_ids = tf.concat([tf.reshape(objids, [-1, 1]), galaxy_ids], axis=0)
+                        #     true_labels = tf.concat([tf.reshape(labels, [-1, 1]), true_labels], axis=0)
+                        #     predictions = tf.concat([tf.reshape(tf.argmax(results, axis= 1), [-1, 1]), predictions], axis=0)
 
-                        prediction_dataframe = pd.DataFrame({
-                            "Id": galaxy_ids.numpy().astype(str).reshape((-1)),
-                            "True": true_labels.numpy().reshape((-1)),
-                            "Prediction": predictions.numpy().reshape((-1))
-                        })
+                        # prediction_dataframe = pd.DataFrame({
+                        #     "Id": galaxy_ids.numpy().astype(str).reshape((-1)),
+                        #     "True": true_labels.numpy().reshape((-1)),
+                        #     "Prediction": predictions.numpy().reshape((-1))
+                        # })
 
-                        prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
+                        # prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
                         
-                        del model
-                        gc.collect()
+                        # del model
+                        # gc.collect()
+
+                        f = open(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/finished.txt", "w")
+                        f.write(now = datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+                        f.close()
 
                         break
                 
