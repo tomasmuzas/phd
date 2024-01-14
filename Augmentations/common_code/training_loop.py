@@ -258,7 +258,7 @@ def perform_training(models, training_config):
                         print("Early stopping")
 
                         print("Getting final predictions with objids")
-                        model = model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+                        model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
 
                         galaxy_ids = np.empty([0, 1], dtype=str)
                         true_labels = np.empty([0, 1], dtype=float)
