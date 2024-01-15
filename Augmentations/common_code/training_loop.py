@@ -293,7 +293,7 @@ def perform_training(models, training_config):
                 
                 wandb.finish()
 
-            # tf.keras.backend.clear_session()
+            tf.keras.backend.clear_session()
             # del cached_initial_training_dataset
             # del test_dataset
             # del test_dataset_with_objids
