@@ -255,7 +255,7 @@ def perform_training(models, training_config):
                         print("Loss improved. Saving model.")
                         best_epoch = epoch
                         best_loss = last_loss
-                        model.save_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
+                        model.save_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/weights")
 
                     if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
