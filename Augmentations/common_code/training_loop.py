@@ -138,6 +138,7 @@ def perform_training(models, training_config):
 
             if training_config["TPU"]:
                 test_dataset = test_dataset.cache()
+                test_dataset = test_dataset.prefetch(10)
 
             print("Getting cached test dataset with objids")
             test_dataset_with_objids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", 1024)
