@@ -140,11 +140,13 @@ def perform_training(models, training_config):
                 test_dataset = test_dataset.cache()
                 test_dataset = test_dataset.prefetch(10)
 
-            print("Getting cached test dataset with objids")
-            test_dataset_with_objids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", 1024)
-            test_dataset_with_objids = test_dataset_with_objids.cache()
-
-
+            print("Getting cached train dataset base")
+            cached_initial_training_dataset = get_intial_fold_dataset(
+                training_config,
+                f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/train",
+                training_config["SEED"],
+                shuffle = True)
+            
             # Begin training for each model
             for model in models:
                 model_name = model['name']
