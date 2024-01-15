@@ -292,11 +292,11 @@ def perform_training(models, training_config):
                 
                 wandb.finish()
 
-            tf.keras.backend.clear_session()
-            del cached_initial_training_dataset
-            del test_dataset
-            del test_dataset_with_objids
-            gc.collect()
+            # tf.keras.backend.clear_session()
+            # del cached_initial_training_dataset
+            # del test_dataset
+            # del test_dataset_with_objids
+            # gc.collect()
             
             # best_model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}")
             # test_dataset_with_ids = get_dataset_with_objids(f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test", training_config["TEST_BATCH_SIZE"])
