@@ -285,7 +285,7 @@ def perform_training(models, training_config):
                         # gc.collect()
 
                         f = open(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/finished.txt", "w")
-                        f.write(now = datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
+                        f.write(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
                         f.close()
 
                         break
