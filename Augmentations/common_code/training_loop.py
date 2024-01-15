@@ -288,7 +288,7 @@ def perform_training(models, training_config):
                 
                 wandb.finish()
 
-            tf.tpu.experimental.initialize_tpu_system(tf.distribute.cluster_resolver.TPUClusterResolver)
+            tf.tpu.experimental.initialize_tpu_system(tf.distribute.cluster_resolver.TPUClusterResolver())
             gc.collect()
             # tf.keras.backend.clear_session()
             # del cached_initial_training_dataset
