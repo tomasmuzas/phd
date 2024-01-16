@@ -210,7 +210,7 @@ def perform_training(models, training_config):
                 best_loss = 10
 
                 print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/weights")
-                model = model_factory()
+                model = model_factory(training_config)
                 model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/weights")
 
                 if binary_mode:
