@@ -155,32 +155,38 @@ def perform_training(models, training_config):
                 model_path = f"{experiment_path}/{model_name}"
                 initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
 
-                # Create initial model
-                if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
-                    print("Creating new weights")
-                    if(training_config["USE_ADABELIEF_OPTIMIZER"]):
-                        print("using AdaBelief optimizer")
-                        optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
-                    else:
-                        print("Using Adam optimizer")
-                        optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
-                    model = model_factory(training_config)
+                if not os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}/weights.index"):
+                    # Create initial model
+                    if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
+                        print("Creating new model")
+                        if(training_config["USE_ADABELIEF_OPTIMIZER"]):
+                            print("using AdaBelief optimizer")
+                            optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
+                        else:
+                            print("Using Adam optimizer")
+                            optimizer = optimizers.Adam(learning_rate= training_config["LEARNING_RATE"], beta_1=0.9, beta_2=0.999, epsilon=1e-08)
+                        model = model_factory(training_config)
 
-                    if binary_mode:
-                        model.compile(
-                            loss=tf.keras.losses.BinaryCrossentropy(),
-                            steps_per_execution = 1,
-                            optimizer=optimizer,
-                            metrics=[tf.keras.metrics.BinaryAccuracy()])
-                    else:
-                        model.compile(
-                            loss=tf.keras.losses.SparseCategoricalCrossentropy(),
-                            steps_per_execution = 1,
-                            optimizer=optimizer,
-                            metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
+                        if binary_mode:
+                            model.compile(
+                                loss=tf.keras.losses.BinaryCrossentropy(),
+                                steps_per_execution = 1,
+                                optimizer=optimizer,
+                                metrics=[tf.keras.metrics.BinaryAccuracy()])
+                        else:
+                            model.compile(
+                                loss=tf.keras.losses.SparseCategoricalCrossentropy(),
+                                steps_per_execution = 1,
+                                optimizer=optimizer,
+                                metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
 
-                    print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                    model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                        print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                    
+                    # Model is created
+                    print("Saving new weights")
+                    model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                    model.save_weights(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}/weights")
 
                 training_config["MODEL_NAME"] = model_name
                 
@@ -204,7 +210,8 @@ def perform_training(models, training_config):
                 best_loss = 10
 
                 print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                # model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/weights")
 
                 if binary_mode:
                     model.compile(
