@@ -186,7 +186,7 @@ def perform_training(models, training_config):
                     # Model is created
                     print("Saving new weights")
                     model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                    model.save_weights(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}/weights")
+                    model.save_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/weights")
 
                 training_config["MODEL_NAME"] = model_name
                 
