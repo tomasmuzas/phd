@@ -3,7 +3,7 @@ from .augmentation_functions import *
 
 AUTO = tf.data.AUTOTUNE
 
-def get_intial_fold_dataset(training_config, path, seed, shuffle, cache_name = None):
+def get_intial_fold_dataset(training_config, path, seed, shuffle, cache = False):
   if not training_config["ENABLE_DETERMINISM"]:
     seed = None
 
@@ -24,9 +24,9 @@ def get_intial_fold_dataset(training_config, path, seed, shuffle, cache_name = N
       }),
       num_parallel_calls=AUTO)
   dataset = dataset.map(lambda item: (tf.reshape(tf.image.decode_jpeg(item['image'], channels=3), [training_config["IMAGE_SIZE"], training_config["IMAGE_SIZE"], 3]), item['class']), num_parallel_calls=AUTO)
-  if(cache_name is not None):
-    print(f"caching jpeg dataset into {cache_name}")
-    dataset = dataset.cache(cache_name)
+  if(cache):
+    print(f"caching jpeg dataset into memory")
+    dataset = dataset.cache()
 
   dataset = dataset.map(lambda x,y: (tf.cast(x, tf.float32), y), num_parallel_calls=AUTO)
   dataset = dataset.map(lambda x,y: (tf.keras.layers.Rescaling(scale=1./255)(x), y), num_parallel_calls=AUTO)
