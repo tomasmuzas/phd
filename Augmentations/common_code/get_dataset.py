@@ -27,7 +27,7 @@ def get_intial_fold_dataset(training_config, path, seed, shuffle):
   dataset = dataset.map(lambda x,y: (tf.cast(x, tf.float32), y), num_parallel_calls=AUTO)
   dataset = dataset.map(lambda x,y: (tf.keras.layers.Rescaling(scale=1./255)(x), y), num_parallel_calls=AUTO)
   if(training_config["TPU"]):
-    dataset = dataset.cache()
+    dataset = dataset.cache(training_config["EXPERIMENT_DESCRIPTION"]+ "_cache")
 
   return dataset
 
