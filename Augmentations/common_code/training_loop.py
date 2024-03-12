@@ -126,18 +126,10 @@ def perform_training(models, training_config):
                 training_config,
                 f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/test",
                 seed = training_config["SEED"],
-                shuffle = False)
-
-            test_dataset = shuffle_dataset(
-                test_dataset,
-                training_config,
-                training_config["TEST_BATCH_SIZE"],
-                seed = training_config["SEED"],
-                augment = False,
-                drop_remainder = training_config["TPU"])
+                shuffle = False,
+                cache_name = training_config["EXPERIMENT_DESCRIPTION"]+ f"_fold_{fold}_test_cache").batch(training_config["TEST_BATCH_SIZE"], drop_remainder = training_config["TPU"])
 
             if training_config["TPU"]:
-                test_dataset = test_dataset.cache(training_config["EXPERIMENT_DESCRIPTION"]+ f"_fold_{fold}_test_cache")
                 test_dataset = test_dataset.prefetch(AUTO)
 
             print("Getting cached train dataset base")
@@ -145,7 +137,8 @@ def perform_training(models, training_config):
                 training_config,
                 f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/train",
                 training_config["SEED"],
-                shuffle = True).cache(training_config["EXPERIMENT_DESCRIPTION"]+ f"_fold_{fold}_train_cache")
+                shuffle = True,
+                cache_name = training_config["EXPERIMENT_DESCRIPTION"]+ f"_fold_{fold}_train_cache")
             
             # Begin training for each model
             for model in models:
