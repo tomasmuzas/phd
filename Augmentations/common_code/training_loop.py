@@ -137,15 +137,15 @@ def perform_training(models, training_config):
                 drop_remainder = training_config["TPU"])
 
             if training_config["TPU"]:
-                test_dataset = test_dataset.cache()
-                test_dataset = test_dataset.prefetch(10)
+                test_dataset = test_dataset.cache(training_config["EXPERIMENT_DESCRIPTION"]+ f"_fold_{fold}_test_cache")
+                test_dataset = test_dataset.prefetch(AUTO)
 
             print("Getting cached train dataset base")
             cached_initial_training_dataset = get_intial_fold_dataset(
                 training_config,
                 f"{training_config['REMOTE_GCP_PATH_BASE']}/{training_config['DATASET_PATH']}/fold_{fold}/train",
                 training_config["SEED"],
-                shuffle = True)
+                shuffle = True).cache(training_config["EXPERIMENT_DESCRIPTION"]+ f"_fold_{fold}_train_cache")
             
             # Begin training for each model
             for model in models:
