@@ -4,6 +4,7 @@ def reset_tpu(training_config):
   if training_config["TPU"]:
     cluster_resolver = tf.distribute.cluster_resolver.TPUClusterResolver()
     tf.config.experimental_connect_to_cluster(cluster_resolver)
+    tf.tpu.experimental.initialize_tpu_system(tpu)
     strategy = tf.distribute.TPUStrategy(cluster_resolver)
     print("Running on TPU ", cluster_resolver.master())
     print("REPLICAS: ", strategy.num_replicas_in_sync)
