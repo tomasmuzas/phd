@@ -52,6 +52,8 @@ def shuffle_dataset(dataset, training_config, batch_size, seed, augment, drop_re
         dataset = dataset.map(lambda x,y : (targeted_outside_noise(x, seed), y), num_parallel_calls=AUTO)
       if training_config["AUGMENTATIONS_PERLIN_CENTER_NOISE"]:
         dataset = dataset.map(lambda x,y : (perlin_center_noise(x, seed), y), num_parallel_calls=AUTO)
+      if training_config["AUGMENTATIONS_SALT_AND_PEPPER"]:
+        dataset = dataset.map(lambda x,y : (salt_and_pepper_noise(x, 0.05, seed), y), num_parallel_calls=AUTO)
 
   dataset = dataset.batch(batch_size, drop_remainder=drop_remainder)
 

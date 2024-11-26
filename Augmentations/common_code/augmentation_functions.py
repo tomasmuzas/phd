@@ -56,6 +56,19 @@ def random_noise(x, seed):
 
 
 @tf.function
+def salt_and_pepper_noise(x, prob, seed):
+  if  tf.random.uniform([], seed = seed) < 0.5:
+    prob_salt = prob / 2.0 
+    prob_pepper = prob / 2.0 
+    random_values = tf.random.uniform(shape=x[:, :, -1:].shape, seed = seed)
+    x = tf.where(random_values < prob_salt, 1., x)
+    x = tf.where(1 - random_values < prob_pepper, 0., x)
+    return x
+  else:
+    x
+  return x
+
+@tf.function
 def targeted_center_noise(x, seed):
   if  tf.random.uniform([], seed = seed) < 0.5:
     noise = tf.random.uniform(shape=tf.shape(x), minval= -0.2, maxval= 0.2, dtype=tf.float32)
