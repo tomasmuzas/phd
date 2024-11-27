@@ -115,9 +115,10 @@ def perform_training(models, training_config):
     
     os.environ["WANDB_SILENT"] = "True"
 
-    for fold in range(1, training_config["FOLDS"] + 1):
+    strategy = reset_tpu(training_config)
 
-        strategy = reset_tpu(training_config)
+    for fold in range(1, training_config["FOLDS"] + 1):
+        
         with strategy.scope():
 
             # Fetch and cache training dataset for the fold
@@ -289,7 +290,7 @@ def perform_training(models, training_config):
                 wandb.finish()
 
 
-        # tf.keras.backend.clear_session()
+        tf.keras.backend.clear_session()
             # del cached_initial_training_dataset
             # del test_dataset
             # del test_dataset_with_objids
