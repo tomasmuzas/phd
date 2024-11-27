@@ -3,6 +3,7 @@ import numpy as np
 from astropy.visualization import PercentileInterval
 from astropy.modeling.models import Sersic2D
 from perlin_numpy import generate_perlin_noise_2d
+import tensorflow_models as tfm
 
 x,y = np.meshgrid(np.arange(128), np.arange(128))
 
@@ -64,6 +65,14 @@ def salt_and_pepper_noise(x, prob, seed):
     x = tf.where(random_values < prob_salt, 1., x)
     x = tf.where(1 - random_values < prob_pepper, 0., x)
     return x
+  else:
+    x
+  return x
+
+@tf.function
+def cutout(x, size, seed):
+  if  tf.random.uniform([], seed = seed) < 0.5:
+    return tfm.vision.augment.cutout(x, size)
   else:
     x
   return x
