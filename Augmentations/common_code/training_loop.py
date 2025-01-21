@@ -5,7 +5,6 @@ from .get_dataset import get_intial_fold_dataset, shuffle_dataset
 import tensorflow as tf
 import json
 from pathlib import Path
-import tensorflow_addons as tfa
 import wandb
 import numpy as np
 from sklearn.metrics import confusion_matrix, ConfusionMatrixDisplay, accuracy_score, f1_score, precision_score, recall_score
@@ -149,7 +148,7 @@ def perform_training(models, training_config):
                 model_path = f"{experiment_path}/{model_name}"
                 initial_model_path = f"models/{image_size}x{image_size}/initial_models/{training_config['NUMBER_OF_CLASSES']}_Classes/{model_name}"
 
-                if not os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}/weights.index"):
+                if not os.path.exists(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}/{model_name}.weights.h5"):
                     # Create initial model
                     if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
                         print("Creating new model")
@@ -175,12 +174,12 @@ def perform_training(models, training_config):
                                 metrics=[tf.keras.metrics.SparseCategoricalAccuracy()])
 
                         print(f"Saving initial model to {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
+                        model.save(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/{model_name}.keras")
                     
                     # Model is created
                     print("Saving new weights")
-                    model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}")
-                    model.save_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/weights")
+                    model = tf.keras.models.load_model(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/{model_name}.keras")
+                    model.save_weights(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}/{model_name}.weights.h5")
 
                 training_config["MODEL_NAME"] = model_name
                 
@@ -205,7 +204,7 @@ def perform_training(models, training_config):
 
                 print(f"Loading model from {training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/weights")
                 model = model_factory(training_config)
-                model.load_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{initial_model_path}/weights")
+                model.load_weights(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}/{model_name}.weights.h5")
 
                 if binary_mode:
                     model.compile(
@@ -252,7 +251,8 @@ def perform_training(models, training_config):
                         print("Loss improved. Saving model.")
                         best_epoch = epoch
                         best_loss = last_loss
-                        model.save_weights(f"{training_config['REMOTE_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/weights")
+                        os.makedirs(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}", exist_ok=True)
+                        model.save_weights(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/{model_name}.weights.h5")
 
                     if(epoch - training_config["EARLY_STOPPING_TOLERANCE"] == best_epoch):
                         print("Early stopping")
