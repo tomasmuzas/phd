@@ -278,8 +278,8 @@ def perform_training(models, training_config):
 
                         # prediction_dataframe.to_csv(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/predictions.csv")
                         
-                        del model
-                        gc.collect()
+                        # del model
+                        # gc.collect()
 
                         f = open(f"{training_config['LOCAL_GCP_PATH_BASE']}/{model_path}/best_loss/fold_{fold}/finished.txt", "w")
                         f.write(datetime.now().strftime("%d/%m/%Y %H:%M:%S"))
@@ -290,7 +290,7 @@ def perform_training(models, training_config):
                 wandb.finish()
 
 
-        tf.keras.backend.clear_session()
+        # tf.keras.backend.clear_session()
             # del cached_initial_training_dataset
             # del test_dataset
             # del test_dataset_with_objids
