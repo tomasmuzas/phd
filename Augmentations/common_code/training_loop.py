@@ -152,6 +152,9 @@ def perform_training(models, training_config):
                     # Create initial model
                     if not os.path.isdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}"):
                         print("Creating new model")
+
+                        os.mkdir(f"{training_config['LOCAL_GCP_PATH_BASE']}/{initial_model_path}")
+
                         if(training_config["USE_ADABELIEF_OPTIMIZER"]):
                             print("using AdaBelief optimizer")
                             optimizer = tfa.optimizers.AdaBelief(lr=training_config["LEARNING_RATE"])
